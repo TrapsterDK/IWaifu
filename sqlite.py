@@ -30,7 +30,7 @@ class SQLite:
 
     # returns True if the user was added, otherwise returns False
     def add_user(self, username: str, password: str) -> bool:
-        if self.username_exists(username):
+        if self.get_username_id(username) != None:
             return False
         
         salt = generate_salt()
@@ -57,7 +57,7 @@ class SQLite:
 
 
     # returns the user id if the user exists, otherwise returns None
-    def username_exists(self, username: str) -> int or None:
+    def get_username_id(self, username: str) -> int or None:
         self.conn.execute('SELECT * FROM users WHERE username = ?', (username,))
         user = self.conn.fetchone()
         if user is None:
