@@ -2,3 +2,4 @@ Text to speach
 https://github.com/coqui-ai/TTS
 https://github.com/mozilla/TTS 
 https://huggingface.co/spaces/Plachta/VITS-Umamusume-voice-synthesizer
+https://tts.readthedocs.io/en/latest/tutorial_for_nervous_beginners.html
