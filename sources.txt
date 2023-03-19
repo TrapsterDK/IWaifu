@@ -1,5 +1,29 @@
-Text to speach
+General
+https://www.youtube.com/@SchizoDev
+https://github.com/Koischizo/AI-Vtuber
+
+Text to speech
 https://github.com/coqui-ai/TTS
 https://github.com/mozilla/TTS 
 https://huggingface.co/spaces/Plachta/VITS-Umamusume-voice-synthesizer
 https://tts.readthedocs.io/en/latest/tutorial_for_nervous_beginners.html
+Best easily found model tts_models/en/vctk/vits
+Train VITS model
+
+Face movement
+https://github.com/JosephPai/Awesome-Talking-Face
+https://github.com/pkhungurn/talking-head-anime-3-demo
+
+Text generation
+GPT-3 Curie, because of the price
+as it makes it possible to fine tune it for 10 $
+Dataset
+Use multiple waifu anime dialogues
+Use pretext from what was said before
+
+Speech to text 
+Whisper
+
+Anime
+https://www.wcostream.net/
+https://www.randomanime.org/
