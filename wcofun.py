@@ -5,11 +5,12 @@ import js2py
 import re
 from urllib.parse import urlsplit
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_pcomleted
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
-from copy import copy
 from threading import Lock
 from clint.textui import progress
+from utils import mp4_to_wav
+from os import remove
 
 js2py_lock = Lock()
 
@@ -20,7 +21,7 @@ def get_episodes(anime, scraper):
     r = scraper.get(ANIME_URL + anime)
     
     if r.status_code != 200:
-        return None
+        raise Exception("Could not get anime url")
 
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -40,7 +41,7 @@ def get_video_url(episode_url, scraper):
     r = scraper.get(episode_url)
     
     if r.status_code != 200:
-        return None
+        raise Exception("Could not get episode url")
 
     website_soup = BeautifulSoup(r.text, "html.parser")
 
@@ -56,7 +57,7 @@ def get_video_url(episode_url, scraper):
     sleep(1)
 
     with js2py_lock:
-        iframe_soup = BeautifulSoup(ctx.eval(copy(str(script))), "html.parser")
+        iframe_soup = BeautifulSoup(ctx.eval(script), "html.parser")
 
     iframe = iframe_soup.select_one("iframe")
     if iframe is None:
@@ -69,7 +70,7 @@ def get_video_url(episode_url, scraper):
     r = scraper.get(iframe_url)
 
     if r.status_code != 200:
-        return None
+        raise Exception("Could not get iframe url")
 
     video_get_url = re.search(REGEX_VIDEO_GET_LINK, r.text)
 
@@ -87,81 +88,97 @@ def get_video_url(episode_url, scraper):
     r = scraper.get(video_get_url)
 
     if r.status_code != 200:
-        return None
+        raise Exception("Could not get video url")
     
     video_json = r.json()
     if not ("server" in video_json and "enc" in video_json): 
         raise Exception("Could not find video url in json")
     
+    scraper.headers.pop("x-requested-with")
+    scraper.headers.pop("Referer")
+    
     return video_json["server"] + "/getvid?evid=" + video_json["enc"]
 
 
-def scraper_retry(function, *args, max_retries=15, **kwargs):
+def download_video(video_url, filename, scraper, chunk_size=4096 * 4096):
+    r = scraper.get(video_url, stream=True)
+
+    total_length = int(r.headers.get('content-length'))
+    with open(filename, "wb") as f:
+        for chunk in progress.bar(r.iter_content(chunk_size=chunk_size), expected_size=(total_length/(chunk_size)) + 1): 
+            if chunk:
+                f.write(chunk)
+                f.flush()
+
+
+def download_episode(episode_url, directory):
+    print("Getting video url for episode {}".format(episode_url))
+
     scraper = cloudscraper.create_scraper()
-    tries = 0
     while True:
         try:
-            tries += 1
-            if tries > max_retries:
-                return None
+            video_url = get_video_url(episode_url, scraper)
+            break
+        except cloudscraper.exceptions.CloudflareChallengeError:
+            scraper = cloudscraper.create_scraper()
 
-            return function(*args, **kwargs, scraper=scraper)
+    filename = directory + episode_url.split("/")[-1] + ".mp4"
+
+    print("Downloading episode {}".format(episode_url))
+
+    try:
+        download_video(video_url, filename, scraper)
+    except cloudscraper.exceptions.CloudflareChallengeError:
+        return download_episode(episode_url, directory)
+    
+    return filename
+
+
+def get_episodes_retry(anime):
+    scraper = cloudscraper.create_scraper()
+    while True:
+        try:
+            return get_episodes(anime, scraper)
         except cloudscraper.exceptions.CloudflareChallengeError:
             scraper = cloudscraper.create_scraper()
 
 
-def get_all_videos(anime):
-    with ThreadPoolExecutor() as executor:
-        episodes = scraper_retry(get_episodes, anime)
-        print(f"Found {len(episodes)} episodes, getting video urls")
-        results = list(tqdm(executor.map(scraper_retry, [get_video_url] * len(episodes), [episode[1] for episode in episodes]), total=len(episodes)))
- 
-        return results
+def download_animes(anime, directory, function_on_complete=None):
+    episodes = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        downloaded = 0
+        print("Getting episodes for animes")
+
+        futures = []
+        for anime in anime:
+            futures.append(executor.submit(get_episodes_retry, anime))
+
+        for future in as_completed(futures):
+            downloaded += 1
+            print(f"Found {len(future.result())} episodes for {anime}, {downloaded}/{len(futures)}")
+            episodes += future.result()
+            
+    with ThreadPoolExecutor(max_workers=5) as executor: 
+        downloaded = 0
+        print("Downloading episodes")
+
+        futures = []
+        for episode in episodes:
+            futures.append(executor.submit(download_episode, episode[1], directory))
+
+        for future in as_completed(futures):
+            downloaded += 1
+            print(f"Downloaded episode {downloaded}/{len(episodes)}")
+
+            if function_on_complete is not None:
+                function_on_complete(future.result())
 
 
-def download_video(video_url, filename, scraper):
-    r = scraper.get(video_url, stream=True)
-
-    total_length = int(r.headers.get('content-length'))
-    with open(filename, "wb") as handle:
-        for data in r.iter_content(chunk_size=4096):
+def video_to_audio_and_delete(filename, new_directory):
+    new_filename = new_directory + filename.split("/")[-1].split('.')[0] + ".wav"
+    mp4_to_wav(filename, new_filename)
+    remove(filename)
 
 
-video = None
-while True:
-    scraper = cloudscraper.create_scraper()
-    try:
-        video = get_video_url("https://www.wcofun.com/beyblade-burst-season-2-episode-27-english-subbed", scraper)
-        break
-    except Exception as e:
-        scraper = cloudscraper.create_scraper()
-    
-while True:
-    try:
-        download_video(video, "test.mp4", scraper)
-        break
-    except Exception as e:
-        break
-
-
-'''
-scraper = cloudscraper.create_scraper() 
-while True:
-    try:
-        #link = get_video_url("https://www.wcofun.com/sword-art-online-episode-12-english-dubbed-2", scraper) 
-        #link2 = get_video_url("https://www.wcofun.com/sword-art-online-episode-13-english-dubbed-2", scraper) 
-        #print(link)
-        #print(link2)
-
-        """r = scraper.get(link, stream=True)
-        with open("test.mp4", "wb") as handle:
-            for data in tqdm(r.iter_content()):
-                handle.write(data)
-        """
-
-        break
-
-    except Exception as e:
-        scraper = cloudscraper.create_scraper()
-        print(e)
-'''
+if __name__ == "__main__":
+    download_animes(["sword-art-online"], "anime_videos/", lambda filename: video_to_audio_and_delete(filename, "anime_audios/"))

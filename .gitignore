@@ -163,3 +163,4 @@ cython_debug/
 Scripts/
 /Scripts/pip.exe
 /Include
+/anime_audios

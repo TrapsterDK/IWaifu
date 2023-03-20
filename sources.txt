@@ -9,6 +9,7 @@ https://huggingface.co/spaces/Plachta/VITS-Umamusume-voice-synthesizer
 https://tts.readthedocs.io/en/latest/tutorial_for_nervous_beginners.html
 Best easily found model tts_models/en/vctk/vits
 Train VITS model
+https://github.com/speechbrain/speechbrain
 
 Face movement
 https://github.com/JosephPai/Awesome-Talking-Face
