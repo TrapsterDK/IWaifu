@@ -5,10 +5,11 @@ import js2py
 import re
 from urllib.parse import urlsplit
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_pcomleted
 from time import sleep
 from copy import copy
 from threading import Lock
+from clint.textui import progress
 
 js2py_lock = Lock()
 
@@ -97,7 +98,6 @@ def get_video_url(episode_url, scraper):
 
 def scraper_retry(function, *args, max_retries=15, **kwargs):
     scraper = cloudscraper.create_scraper()
-
     tries = 0
     while True:
         try:
@@ -118,13 +118,30 @@ def get_all_videos(anime):
  
         return results
 
-def download_video(video_url, filename):
-    r = scraper.get(link, stream=True)
-    with open("test.mp4", "wb") as handle:
-        for data in tqdm(r.iter_content()):
-            handle.write(data)
 
-print(get_all_videos("sword-art-online"))
+def download_video(video_url, filename, scraper):
+    r = scraper.get(video_url, stream=True)
+
+    total_length = int(r.headers.get('content-length'))
+    with open(filename, "wb") as handle:
+        for data in r.iter_content(chunk_size=4096):
+
+
+video = None
+while True:
+    scraper = cloudscraper.create_scraper()
+    try:
+        video = get_video_url("https://www.wcofun.com/beyblade-burst-season-2-episode-27-english-subbed", scraper)
+        break
+    except Exception as e:
+        scraper = cloudscraper.create_scraper()
+    
+while True:
+    try:
+        download_video(video, "test.mp4", scraper)
+        break
+    except Exception as e:
+        break
 
 
 '''
