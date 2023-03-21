@@ -9,8 +9,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
 from threading import Lock
 from clint.textui import progress
-from utils import mp4_to_wav
+from utils import mp4_to_mp3, file_log_write
 from os import remove
+import ffmpeg
+import pathlib
 
 js2py_lock = Lock()
 
@@ -112,8 +114,6 @@ def download_video(video_url, filename, scraper, chunk_size=4096 * 4096):
 
 
 def download_episode(episode_url, directory):
-    print("Getting video url for episode {}".format(episode_url))
-
     scraper = cloudscraper.create_scraper()
     while True:
         try:
@@ -122,9 +122,7 @@ def download_episode(episode_url, directory):
         except cloudscraper.exceptions.CloudflareChallengeError:
             scraper = cloudscraper.create_scraper()
 
-    filename = directory + episode_url.split("/")[-1] + ".mp4"
-
-    print("Downloading episode {}".format(episode_url))
+    filename = directory.joinpath(pathlib.Path(episode_url.split("/")[-1] + ".mp4"))
 
     try:
         download_video(video_url, filename, scraper)
@@ -143,7 +141,7 @@ def get_episodes_retry(anime):
             scraper = cloudscraper.create_scraper()
 
 
-def download_animes(anime, directory, function_on_complete=None):
+def download_animes(anime, directory, function_on_complete=None, function_on_error=None):
     episodes = []
     with ThreadPoolExecutor(max_workers=5) as executor:
         downloaded = 0
@@ -155,7 +153,7 @@ def download_animes(anime, directory, function_on_complete=None):
 
         for future in as_completed(futures):
             downloaded += 1
-            print(f"Found {len(future.result())} episodes for {anime}, {downloaded}/{len(futures)}")
+            print(f"Found {len(future.result())} episodes, anime {downloaded}/{len(futures)}")
             episodes += future.result()
             
     with ThreadPoolExecutor(max_workers=5) as executor: 
@@ -170,15 +168,38 @@ def download_animes(anime, directory, function_on_complete=None):
             downloaded += 1
             print(f"Downloaded episode {downloaded}/{len(episodes)}")
 
-            if function_on_complete is not None:
+            if future.exception() is not None and function_on_error is not None:
+                function_on_error(future.exception())
+
+            elif function_on_complete is not None:
                 function_on_complete(future.result())
 
 
-def video_to_audio_and_delete(filename, new_directory):
-    new_filename = new_directory + filename.split("/")[-1].split('.')[0] + ".wav"
-    mp4_to_wav(filename, new_filename)
-    remove(filename)
+
+def complete_handler(path, new_directory, log_file):
+    print("Converting to mp3")
+    new_filename = str(new_directory) + pathlib.Path(path).stem + ".mp3"
+
+    try:
+        mp4_to_mp3(path, new_filename)
+    except ffmpeg.Error as e:
+        file_log_write(log_file, str(path), e)
+        return
+
+    file_log_write(log_file, str(path))
+    remove(path)
 
 
 if __name__ == "__main__":
-    download_animes(["sword-art-online"], "anime_videos/", lambda filename: video_to_audio_and_delete(filename, "anime_audios/"))
+    video_directory = pathlib.Path("anime_videos/")
+    audio_directory = pathlib.Path("anime_audios/")
+    log = pathlib.Path("download_log.txt")
+    
+    if not video_directory.exists():
+        video_directory.mkdir()
+    
+    if not audio_directory.exists():
+        audio_directory.mkdir()
+
+    with open(log, "w") as download_log:
+        download_animes(["sword-art-online"], video_directory, lambda filename: complete_handler(filename, audio_directory, download_log))
