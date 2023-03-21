@@ -137,8 +137,26 @@ def get_episodes_retry(anime):
     while True:
         try:
             return get_episodes(anime, scraper)
+            
         except cloudscraper.exceptions.CloudflareChallengeError:
             scraper = cloudscraper.create_scraper()
+
+def download_episodes_multiple_animes(animes, csv_handle):
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        downloaded = 0
+        print("Getting episodes for animes")
+
+        futures = {executor.submit(get_episodes_retry, anime): anime for anime in animes}
+
+        for future in as_completed(futures):
+            anime = futures[future]
+
+            downloaded += 1
+            
+            if future.exception() is not None:
+                csv_handle.write(future.exception())
+
+            print(f"Found {len(future.result())} episodes, anime {downloaded}/{len(futures)}")
 
 
 def download_animes(anime, directory, function_on_complete=None, function_on_error=None):
@@ -173,6 +191,7 @@ def download_animes(anime, directory, function_on_complete=None, function_on_err
 
             elif function_on_complete is not None:
                 function_on_complete(future.result())
+
 
 
 

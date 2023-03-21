@@ -2,7 +2,14 @@
 import hashlib
 import os
 import ffmpeg
-from pathlib import Path
+import pathlib
+import threading
+import json
+from typing import Any
+
+BASE_PATH = pathlib.Path("D:/iwaifudata/")
+FOLDER_DOWNLOAD_MP4 = BASE_PATH / "mp4"
+FOLDER_DOWNLOAD_MP3 = BASE_PATH / "mp3"
 
 def generate_salt() -> str:
     return os.urandom(32).hex()
@@ -10,7 +17,7 @@ def generate_salt() -> str:
 def hash_password(plaintext: str, salt: str) -> str:
     return hashlib.pbkdf2_hmac('sha256', plaintext, salt, 10000)
 
-def mp4_to_mp3(mp4_file: Path, mp3_file: Path):
+def mp4_to_mp3(mp4_file: pathlib.Path, mp3_file: pathlib.Path):
     stream = ffmpeg.input(str(mp4_file))
     stream = ffmpeg.output(stream, str(mp3_file))
 
@@ -19,26 +26,50 @@ def mp4_to_mp3(mp4_file: Path, mp3_file: Path):
     except ffmpeg.Error as e:
         raise e
     
-LOG_SEPARATOR = " : "
-LOG_ERROR = "E"
-LOG_SUCCESS = "S"
-def file_log_write(file_handle, filename: str, error=False, info=None):
-    write = filename + LOG_SEPARATOR + LOG_ERROR if error else LOG_SUCCESS
-    if info:
-        write += LOG_SEPARATOR + info
-    file_handle.write(write)
 
-def file_log_read(file_handle):
-    for line in file_handle:
-        line = line.split(LOG_SEPARATOR)
-        yield line[0], line[1], line[2] if len(line) == 3 else None
+class Log:
+    def __init__(self, filename: pathlib.Path or str, entry_hook=None, error_hook=None):
+        self.filename = filename
+        self.lock = threading.Lock()
+        self.entry_hook = entry_hook
+        self.error_hook = error_hook
 
-def file_log_get_errors(file_handle):
-    for line in file_log_read(file_handle):
-        if line[1] == LOG_ERROR:
-            yield line
+        try:
+            with open(self.filename, "r") as f:
+                self.log = json.load(f)
+        except FileNotFoundError:
+            self.log = {"processed": {}, "errors": {}, "entries": {}}
 
-def file_log_get_successes(file_handle):
-    for line in file_log_read(file_handle):
-        if line[1] == LOG_SUCCESS:
-            yield line
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        with open(self.filename, "w") as f:
+            json.dump(self.log, f)
+
+    def write_entry(self, key: str, value: Any):
+        with self.lock:
+            self.log["entries"][key] = value
+            if self.entry_hook is not None:
+                self.entry_hook(key, value)
+
+    def write_error(self, key: str, error: str):
+        with self.lock:
+            self.log["errors"][key] = error
+            if self.error_hook is not None:
+                self.error_hook(key, error)
+
+    def move_to_processed(self, key: str):
+        with self.lock:
+            self.log["processed"][key] = self.log["entries"][key]
+            del self.log["entries"][key]
+
+    def get_processed(self) -> dict:
+        return self.log["processed"]
+    
+    def get_errors(self) -> dict:
+        return self.log["errors"]
+    
+    def get_entries(self) -> dict:
+        return self.log["entries"]
+    
