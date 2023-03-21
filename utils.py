@@ -14,7 +14,6 @@ def mp4_to_mp3(mp4_file: Path, mp3_file: Path):
     stream = ffmpeg.input(str(mp4_file))
     stream = ffmpeg.output(stream, str(mp3_file))
 
-    print(str(mp4_file), str(mp3_file))
     try:
         ffmpeg.run(stream, quiet=True)
     except ffmpeg.Error as e:
