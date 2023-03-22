@@ -2,6 +2,7 @@ import sqlite3
 from flask import current_app, g
 from utils import hash_password, generate_salt
 
+
 class SQLite:
     def __init__(self, db_file):
         self.db_file = db_file
@@ -24,26 +25,27 @@ class SQLite:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
             password TEXT NOT NULL,
+            email TEXT NOT NULL,
             salt TEXT NOT NULL,
         )''')
 
 
     # returns True if the user was added, otherwise returns False
-    def add_user(self, username: str, password: str) -> bool:
-        if self.get_username_id(username) != None:
+    def add_user(self, username: str, password: str, email: str) -> bool:
+        if self.username_exists(username) or self.email_exists(email):
             return False
         
         salt = generate_salt()
         hashed_password = hash_password(password, salt)
-        self.conn.execute('INSERT INTO users (username, password, salt) VALUES (?, ?, ?)', (username, hashed_password, salt))
+        self.conn.execute('INSERT INTO users (username, password, email, salt) VALUES (?, ?, ?, ?)', (username, hashed_password, email, salt))
         self.db.commit()
 
         return True
 
 
     # returns True if the user exists and the password is correct, otherwise returns False
-    def verify_user(self, username: str, password: str) -> bool:
-        self.conn.execute('SELECT * FROM users WHERE username = ?', (username,))
+    def verify_user(self, email: str, password: str) -> bool:
+        self.conn.execute('SELECT * FROM users WHERE email = ?', (email,))
         user = self.conn.fetchone()
         if user is None:
             return False
@@ -56,16 +58,33 @@ class SQLite:
         return True
 
 
-    # returns the user id if the user exists, otherwise returns None
-    def get_username_id(self, username: str) -> int or None:
-        self.conn.execute('SELECT * FROM users WHERE username = ?', (username,))
+    # returns true if the username exists, otherwise returns false
+    def username_exists(self, username: str) -> int or None:
+        self.conn.execute('SELECT id FROM users WHERE username = ?', (username,))
+        user_id = self.conn.fetchone()
+        if user_id is None:
+            return False
+        
+        return True
+        
+    # returns true if the email exists, otherwise returns false
+    def email_exists(self, email: str) -> int or None:
+        self.conn.execute('SELECT id FROM users WHERE email = ?', (email,))
+        user_id = self.conn.fetchone()
+        if user_id is None:
+            return False
+        
+        return True
+    
+    # returns the user if the user exists, otherwise returns None
+    def get_user(self, user_id: int) -> dict or None:
+        self.conn.execute('SELECT * FROM users WHERE id = ?', (user_id,))
         user = self.conn.fetchone()
         if user is None:
             return None
         
-        return user['id']
+        return user        
         
-    
 
 def get_db() -> SQLite:
     if 'db' not in g:
