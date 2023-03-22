@@ -28,10 +28,10 @@ def mp4_to_mp3(mp4_file: pathlib.Path, mp3_file: pathlib.Path):
     
 
 class Log:
-    def __init__(self, filename: pathlib.Path or str, entry_hook=None, error_hook=None):
+    def __init__(self, filename: pathlib.Path or str, processed_hook=None, error_hook=None):
         self.filename = filename
         self.lock = threading.Lock()
-        self.entry_hook = entry_hook
+        self.entry_hook = processed_hook
         self.error_hook = error_hook
 
         try:
@@ -47,11 +47,9 @@ class Log:
         with open(self.filename, "w") as f:
             json.dump(self.log, f)
 
-    def write_entry(self, key: str, value: Any):
+    def write_entry(self, key: str):
         with self.lock:
-            self.log["entries"][key] = value
-            if self.entry_hook is not None:
-                self.entry_hook(key, value)
+            self.log["entries"][key] = None
 
     def write_error(self, key: str, error: str):
         with self.lock:
@@ -59,10 +57,10 @@ class Log:
             if self.error_hook is not None:
                 self.error_hook(key, error)
 
-    def move_to_processed(self, key: str):
+    def move_to_processed(self, key: str, value: Any):
         with self.lock:
-            self.log["processed"][key] = self.log["entries"][key]
-            del self.log["entries"][key]
+            self.log["processed"][key] = value
+            del self.log["entries"][key] 
 
     def get_processed(self) -> dict:
         return self.log["processed"]

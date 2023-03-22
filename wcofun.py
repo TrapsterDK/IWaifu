@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
 from threading import Lock
 from clint.textui import progress
-from utils import mp4_to_mp3, file_log_write
+from utils import mp4_to_mp3, Log
 from os import remove
 import ffmpeg
 import pathlib
@@ -141,7 +141,10 @@ def get_episodes_retry(anime):
         except cloudscraper.exceptions.CloudflareChallengeError:
             scraper = cloudscraper.create_scraper()
 
-def download_episodes_multiple_animes(animes, csv_handle):
+def download_episodes_multiple_animes(animes, log: Log):
+    for anime in animes:
+        log.write_entry(anime)
+
     with ThreadPoolExecutor(max_workers=5) as executor:
         downloaded = 0
         print("Getting episodes for animes")
@@ -153,27 +156,18 @@ def download_episodes_multiple_animes(animes, csv_handle):
 
             downloaded += 1
             
+            print(f"Found anime episodes {downloaded}/{len(futures)}")
+
             if future.exception() is not None:
-                csv_handle.write(future.exception())
+                log.write_error(anime, future.exception())
+                continue
 
-            print(f"Found {len(future.result())} episodes, anime {downloaded}/{len(futures)}")
+            log.move_to_processed(anime, future.result())
 
 
-def download_animes(anime, directory, function_on_complete=None, function_on_error=None):
-    episodes = []
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        downloaded = 0
-        print("Getting episodes for animes")
 
-        futures = []
-        for anime in anime:
-            futures.append(executor.submit(get_episodes_retry, anime))
 
-        for future in as_completed(futures):
-            downloaded += 1
-            print(f"Found {len(future.result())} episodes, anime {downloaded}/{len(futures)}")
-            episodes += future.result()
-            
+def download_episodes(animes, directory):
     with ThreadPoolExecutor(max_workers=5) as executor: 
         downloaded = 0
         print("Downloading episodes")
