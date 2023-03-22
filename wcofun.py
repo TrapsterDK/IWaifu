@@ -4,19 +4,16 @@ import base64
 import js2py
 import re
 from urllib.parse import urlsplit
-from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
 from threading import Lock
 from clint.textui import progress
-from utils import mp4_to_mp3, Log
-from os import remove
-import ffmpeg
 import pathlib
+
 
 js2py_lock = Lock()
 
 URL = "https://www.wcofun.com/"
+DUBBED_URL = URL + "dubbed-anime-list/"
 ANIME_URL = URL + "anime/"
 
 def get_episodes(anime, scraper):
@@ -27,9 +24,11 @@ def get_episodes(anime, scraper):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    episodes: list[(str, str)] = []
+    #episodes: list[(str, str)] = []
+    episodes: list[str] = []
     for episode in soup.select("div.cat-eps > a"):
-        episodes.append((episode.text, episode["href"]))
+        #episodes.append((episode.text, episode["href"]))
+        episodes.append(episode["href"])
 
     return episodes
 
@@ -107,7 +106,8 @@ def download_video(video_url, filename, scraper, chunk_size=4096 * 4096):
 
     total_length = int(r.headers.get('content-length'))
     with open(filename, "wb") as f:
-        for chunk in progress.bar(r.iter_content(chunk_size=chunk_size), expected_size=(total_length/(chunk_size)) + 1): 
+        #for chunk in progress.bar(r.iter_content(chunk_size=chunk_size), expected_size=(total_length/(chunk_size)) + 1): 
+        for chunk in r.iter_content(chunk_size=chunk_size):
             if chunk:
                 f.write(chunk)
                 f.flush()
@@ -141,78 +141,23 @@ def get_episodes_retry(anime):
         except cloudscraper.exceptions.CloudflareChallengeError:
             scraper = cloudscraper.create_scraper()
 
-def download_episodes_multiple_animes(animes, log: Log):
-    for anime in animes:
-        log.write_entry(anime)
-
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        downloaded = 0
-        print("Getting episodes for animes")
-
-        futures = {executor.submit(get_episodes_retry, anime): anime for anime in animes}
-
-        for future in as_completed(futures):
-            anime = futures[future]
-
-            downloaded += 1
-            
-            print(f"Found anime episodes {downloaded}/{len(futures)}")
-
-            if future.exception() is not None:
-                log.write_error(anime, future.exception())
-                continue
-
-            log.move_to_processed(anime, future.result())
-
-
-
-
-def download_episodes(animes, directory):
-    with ThreadPoolExecutor(max_workers=5) as executor: 
-        downloaded = 0
-        print("Downloading episodes")
-
-        futures = []
-        for episode in episodes:
-            futures.append(executor.submit(download_episode, episode[1], directory))
-
-        for future in as_completed(futures):
-            downloaded += 1
-            print(f"Downloaded episode {downloaded}/{len(episodes)}")
-
-            if future.exception() is not None and function_on_error is not None:
-                function_on_error(future.exception())
-
-            elif function_on_complete is not None:
-                function_on_complete(future.result())
-
-
-
-
-def complete_handler(path, new_directory, log_file):
-    print("Converting to mp3")
-    new_filename = str(new_directory) + pathlib.Path(path).stem + ".mp3"
-
+def get_all_dubbed_animes():
     try:
-        mp4_to_mp3(path, new_filename)
-    except ffmpeg.Error as e:
-        file_log_write(log_file, str(path), e)
-        return
+        scraper = cloudscraper.create_scraper()
+        r = scraper.get(DUBBED_URL)
 
-    file_log_write(log_file, str(path))
-    remove(path)
+        if r.status_code != 200:
+            raise Exception("Could not get anime url")
 
+        soup = BeautifulSoup(r.text, "html.parser")
 
+        animes: list[str] = []
+        for anime in soup.select("div.ddmcc > ul > li > a"):
+            animes.append(anime["href"].split("/")[-1])
+
+        return animes
+    except cloudscraper.exceptions.CloudflareChallengeError:
+        return get_all_dubbed_animes()
+    
 if __name__ == "__main__":
-    video_directory = pathlib.Path("anime_videos/")
-    audio_directory = pathlib.Path("anime_audios/")
-    log = pathlib.Path("download_log.txt")
-    
-    if not video_directory.exists():
-        video_directory.mkdir()
-    
-    if not audio_directory.exists():
-        audio_directory.mkdir()
-
-    with open(log, "w") as download_log:
-        download_animes(["sword-art-online"], video_directory, lambda filename: complete_handler(filename, audio_directory, download_log))
+    print(get_all_dubbed_animes())
