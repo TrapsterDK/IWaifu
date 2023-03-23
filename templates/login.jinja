@@ -1,15 +1,14 @@
-{% extends "base.jinja" %} 
-{% block content %}
-<div class="container">
-    <link href="{{ url_for('static', filename='css/logsign.css') }}" rel="stylesheet" />
+{% extends "login_signup.jinja" %} 
+{% block login_signup %}
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
 
-    <form action="/login" method="post" onsubmit="return validateForm()">
-        <h1>Login</h1>
-        <label class="input-label" for="email">Email</label>
-        <input id="email" type="text" name="email" placeholder="email" />
-        <label class="input-label" for="password">Password</label>
-        <input id="password" type="password" name="password" placeholder="password" />
-        <input class="submit" type="submit" value="Login" />
-    </form>
-</div>
+<form id="login-form" action="/login" method="post">
+    <h1>Login</h1>
+    <label class="input-label required" for="email">Email</label>
+    <input id="email" type="text" name="email" placeholder="email" />
+    <label class="input-label required" for="password">Password</label>
+    <input id="password" type="password" name="password" placeholder="password" />
+    <input class="submit" type="submit" value="Login" />
+    <label class="error" hidden></label>
+</form>
 {% endblock %}

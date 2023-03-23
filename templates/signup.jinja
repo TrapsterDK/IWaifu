@@ -1,22 +1,18 @@
-{% extends "base.jinja" %} 
-{% block content %}
-<div class="container">
-    <div class="box">
-        <link href="{{ url_for('static', filename='css/logsign.css') }}" rel="stylesheet" />
-        <script src="{{ url_for('static', filename='js/signup.js') }}"></script>
+{% extends "login_signup.jinja" %} 
+{% block login_signup %}
+<script src="{{ url_for('static', filename='js/signup.js') }}"></script>
 
-        <form id="signup-form" action="/signup" method="post">
-            <h1>Sign up</h1>
-            <label class="input-label" for="username">Username</label>
-            <input id="username" type="text" name="username" placeholder="username" />
-            <label class="input-label" for="email">Email</label>
-            <input id="email" type="text" name="email" placeholder="email" />
-            <label class="input-label" for="password">Password</label>
-            <input id="password" type="password" name="password" placeholder="password" />
-            <label class="input-label" for="verify">Verify Password</label>
-            <input id="verify" type="password" name="verify" placeholder="verify password" />
-            <input class="submit" type="submit" value="Sign up" />
-        </form>
-    </div>
-</div>
+<form id="signup-form" action="/signup" method="post">
+    <h1>Sign up</h1>
+    <label class="input-label required" for="username">Username (4-20 characters)</label>
+    <input id="username" type="text" name="username" placeholder="username" />
+    <label class="input-label required" for="email">Email</label>
+    <input id="email" type="text" name="email" placeholder="email" />
+    <label class="input-label required" for="password">Password (6-20 characters, lower, upper case, number)</label>
+    <input id="password" type="password" name="password" placeholder="password" />
+    <label class="input-label required" for="verify">Verify Password</label>
+    <input id="verify" type="password" name="verify" placeholder="verify password" />
+    <input class="submit" type="submit" value="Sign up" />
+    <label class="error" hidden></label>
+</form>
 {% endblock %}

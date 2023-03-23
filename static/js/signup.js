@@ -21,15 +21,13 @@ $(document).ready(function () {
             password: {
                 required: true,
                 minlength: 6,
-                maxlength: 32,
+                maxlength: 20,
                 lowercase: true,
                 uppercase: true,
                 number: true,
             },
             verify: {
                 required: true,
-                minlength: 6,
-                maxlength: 32,
                 equalTo: "#password",
             },
             email: {
@@ -55,27 +53,13 @@ $(document).ready(function () {
                 number: "Your password must contain at least one number",
             },
             verify: {
-                required: "Please provide a password",
-                minlength: "Your password must be at least 6 characters long",
-                maxlength: "Your password must be less than 20 characters",
+                required: "Please provide a password verification",
                 equalTo: "Please enter the same password as above",
             },
             email: "Please enter a valid email address",
         },
         submitHandler: function (form) {
-            $.ajax({
-                type: "POST",
-                url: "/signup",
-                data: $(form).serialize(),
-                success: function (data) {
-                    if (data === 1) {
-                        window.location.href = "/";
-                    } else {
-                        $("#error").html(data);
-                        $("#error").show();
-                    }
-                },
-            });
+            login_signup_form_handler(form, "/signup");
         },
     });
 });

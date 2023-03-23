@@ -1,0 +1,11 @@
+{% extends "base.jinja" %} 
+{% block content %}
+<div class="container">
+    <div class="box">
+        <link href="{{ url_for('static', filename='css/login_signup.css') }}" rel="stylesheet" />
+        <script src="{{ url_for('static', filename='js/login_signup.js') }}"></script>
+        {% block login_signup %}
+        {% endblock %}
+    </div>
+</div>
+{% endblock %}

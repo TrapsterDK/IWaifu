@@ -77,9 +77,23 @@ input {
 }
 
 input.submit {
-    margin-top: 22px;
     height: 50px;
     font-size: 1.2em;
     color: #fff;
     background-color: #337ab7;
+    margin-top: 20px;
+}
+
+input.submit:hover {
+    background-color: #286090;
+}
+
+input.submit:active {
+    background-color: #337ab7;
+}
+
+label.required:after {
+    color: #e32;
+    content: " *";
+    display: inline;
 }
