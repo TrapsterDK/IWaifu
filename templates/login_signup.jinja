@@ -6,8 +6,13 @@
     <div class="box">
         <link href="{{ url_for('static', filename='css/login_signup.css') }}" rel="stylesheet" />
         <script src="{{ url_for('static', filename='js/login_signup.js') }}"></script>
-        {% block login_signup %}
-        {% endblock %}
+        
+        <form id="login-signup-form">
+            {% block login_signup %}
+            {% endblock %}
+            <input class="submit" type="submit" value="{{ submit }}" />
+            <label class="error" id="server-error" hidden></label>
+        </form>
     </div>
 </div>
 {% endblock %}

@@ -21,11 +21,11 @@ LOG_EPISODES = FOLDER_LOGS / "episodes.json"
 LOG_MP4 = FOLDER_LOGS / "mp4.json"
 LOG_MP3 = FOLDER_LOGS / "mp3.json"
 
-def generate_salt() -> str:
-    return os.urandom(32).hex()
+def generate_salt() -> bytes:
+    return os.urandom(32)
 
 def hash_password(plaintext: str, salt: str) -> str:
-    return hashlib.pbkdf2_hmac('sha256', plaintext, salt, 10000)
+    return hashlib.pbkdf2_hmac('sha256', plaintext.encode('utf-8'), salt, 100000)
 
 def mp4_to_mp3(mp4_file: pathlib.Path, mp3_file: pathlib.Path):
     stream = ffmpeg.input(str(mp4_file))

@@ -1,0 +1,52 @@
+Ide
+Jeg vil lave en anime waifu chat bot som kan kører i browseren,
+denne chat bot skal kunne tale ved brug af text to speech,
+og tage imod input fra brugeren ved brug af text eller speech to text.
+
+Tekniske Krav
+- Chat bot skal kunne kører i browseren
+MAYBE - Chat bot skal kunne kører på alle skærm størrelser
+
+Functionelle Krav
+- Chat bot skal kunne tale
+- Chat bot skal kunne tage imod input fra brugeren
+- Chat bot skal kunne gemme bruger input
+- Skal kunne se anime characteren bevæge sig
+- Skal kunne se anime characteren tale
+- Login system
+
+Design Krav
+- Skal kører i browseren
+- Skal være simpelt og let at forstå
+- Skal være let at navigere rundt i
+- Skal være stort set single page application
+
+Performance Krav
+- Kører i browseren
+- Skal kunne respondere på under 5 sekunder
+
+Tidsplan
+- 1. uge: Login system, website Design
+- 2. uge: Chat bot, text to speech, speech to text
+- 3. uge: Anime character, gemme bruger input
+- 4. uge: Optimering, testing, dokumentation
+
+Bibloteker
+- Flask
+- Flask-login
+- sqlite
+- whisper
+- openai
+- jquery
+- jquery-validate
+
+Faglige underspørgsmål
+- Hvordan kan jeg lave en chat bot?
+- Hvordan kan jeg lave en chat bot som kan tale?
+- Hvordan kan jeg lave en chat bot som kan tage imod input fra brugeren?
+- Hvordan kan jeg lave en chat bot som kan gemme bruger input?
+- Hvordan kan jeg lave en chat bot som kan se anime characteren bevæge sig?
+- Hvordan kan jeg lave en chat bot som kan se anime characteren tale?
+- Hvordan kan jeg lave et login system?
+
+

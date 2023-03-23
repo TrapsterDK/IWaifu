@@ -11,7 +11,7 @@ $.validator.addMethod("number", function (value) {
 });
 
 $(document).ready(function () {
-    $("#signup-form").validate({
+    $("#login-signup-form").validate({
         rules: {
             username: {
                 required: true,

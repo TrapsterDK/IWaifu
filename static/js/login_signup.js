@@ -6,12 +6,12 @@ function login_signup_form_handler(form, url) {
         url: url,
         data: $(form).serialize(),
         success: function (data) {
-            console.log(data);
-            if (data === 1) {
-                window.location.href = "/";
+            if (data === "success") {
+                $(location).prop("href", "/");
             } else {
-                $("#error").html(data);
-                $("#error").show();
+                console.log(data);
+                $("#server-error").html(data);
+                $("#server-error").show();
             }
         },
     });
