@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for
+
+from flask import Flask, render_template, request, redirect
 from sqlite import get_db, close_db
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required, UserMixin
 import os

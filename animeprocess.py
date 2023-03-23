@@ -1,10 +1,11 @@
-from utils import Log, ThreadPoolWithLog, FOLDER_DOWNLOAD_MP4, FOLDER_DOWNLOAD_MP3, FOLDER_LOGS, mp4_to_mp3, LOG_ANIMES, LOG_EPISODES, LOG_MP4, LOG_MP3
+from utils import Log, ThreadPoolRunOnLog, FOLDER_DOWNLOAD_MP4, FOLDER_DOWNLOAD_MP3, FOLDER_LOGS, mp4_to_mp3, LOG_ANIMES, LOG_EPISODES, LOG_MP4, LOG_MP3
 from wcofun import download_episode, get_episodes_retry, get_all_dubbed_animes
-from multiprocessing import Process
+from multiprocessing import Process, Value, Pool
 from multiprocessing.managers import BaseManager
 from functools import partial
 import pathlib
-import msvcrt
+import sys
+import time
 
 def mp4_to_mp3_and_delete(mp4_file: str, mp3_folder: pathlib.Path):
     mp4_file_path = pathlib.Path(mp4_file)
@@ -30,39 +31,37 @@ if __name__ == "__main__":
         log_mp4: Log = manager.Log(LOG_MP4)
         log_mp3: Log = manager.Log(LOG_MP3)
 
+        done = Value("b", False)
+
         if not log_animes_exists:
             print("Finding all dubbed animes...")
-            log_animes.write_entry("dubbed_animes")
-            log_animes.write_processed("dubbed_animes", get_all_dubbed_animes())
+            log_animes.write_tasks(["dubbed_animes"])
+            log_animes.write_task_done("dubbed_animes", get_all_dubbed_animes())
             # just to make sure it's saved
             log_animes.save()
 
+        processess = [
+            Process(target=ThreadPoolRunOnLog, args=(log_animes, log_episodes, get_episodes_retry, done), name="EPS"),
+            Process(target=ThreadPoolRunOnLog, args=(log_episodes, log_mp4, partial(download_episode, directory=FOLDER_DOWNLOAD_MP4), done), name="MP4"),
+            Process(target=ThreadPoolRunOnLog, args=(log_mp4, log_mp3, partial(mp4_to_mp3_and_delete, mp3_folder=FOLDER_DOWNLOAD_MP3), done), name="MP3"),
+        ]
 
-        episode_finder = Process(target=ThreadPoolWithLog, args=("EPFINDER", log_episodes, log_animes, get_episodes_retry))            
+        for process in processess:
+            process.start()
 
-        episode_downloader = Process(target=ThreadPoolWithLog, args=("EPDOWNLD", log_mp4, log_episodes, partial(download_episode, directory=FOLDER_DOWNLOAD_MP4)))
 
-        mp4_to_mp3_converter = Process(target=ThreadPoolWithLog, args=("MP4TOMP3", log_mp3, log_mp4, partial(mp4_to_mp3_and_delete, mp3_folder=FOLDER_DOWNLOAD_MP3), 20))
+        try:
+            while True:
+                time.sleep(0.5)
+                sys.stdout.flush()
 
-        episode_finder.start()
-        episode_downloader.start()
-        mp4_to_mp3_converter.start()
+        except KeyboardInterrupt:
+            print("KeyboardInterrupt, exiting...")
 
-        while True:
-            try:
-                if msvcrt.kbhit():
-                    if msvcrt.getch() == b'q':
-                        break
+        done.value = True
 
-            except KeyboardInterrupt:
-                break
+        # wait for all processes to return
+        for process in processess:
+            process.join()
 
-        print("Exiting...")
-        log_animes.save()
-        log_episodes.save()
-        log_mp4.save()
-        log_mp3.save()
-
-        episode_finder.terminate()
-        episode_downloader.terminate()
-        mp4_to_mp3_converter.terminate()
+        print("Exited successfully")

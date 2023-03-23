@@ -6,8 +6,8 @@ import re
 from urllib.parse import urlsplit
 from time import sleep
 from threading import Lock
-from clint.textui import progress
 import pathlib
+import requests
 
 
 js2py_lock = Lock()
@@ -113,7 +113,7 @@ def download_video(video_url, filename, scraper, chunk_size=4096 * 4096):
                 f.flush()
 
 
-def download_episode(episode_url, directory):
+def download_episode(episode_url, directory, connection_retries=5):
     scraper = cloudscraper.create_scraper()
     while True:
         try:
@@ -121,24 +121,36 @@ def download_episode(episode_url, directory):
             break
         except cloudscraper.exceptions.CloudflareChallengeError:
             scraper = cloudscraper.create_scraper()
+        except requests.exceptions.ConnectionError as e:
+            connection_retries -= 1
+            if connection_retries == 0:
+                raise e
+            sleep(1)
+            scraper = cloudscraper.create_scraper()
 
     filename = directory.joinpath(pathlib.Path(episode_url.split("/")[-1] + ".mp4"))
 
     try:
         download_video(video_url, filename, scraper)
-    except cloudscraper.exceptions.CloudflareChallengeError:
-        return download_episode(episode_url, directory)
+    except cloudscraper.exceptions.CloudflareChallengeError or requests.exceptions.ConnectionError:
+        return download_episode(episode_url, directory, connection_retries=connection_retries)
     
     return str(filename)
 
 
-def get_episodes_retry(anime):
+def get_episodes_retry(anime, connection_retries=5):
     scraper = cloudscraper.create_scraper()
     while True:
         try:
             return get_episodes(anime, scraper)
             
         except cloudscraper.exceptions.CloudflareChallengeError:
+            scraper = cloudscraper.create_scraper()
+        except requests.exceptions.ConnectionError as e:
+            connection_retries -= 1
+            if connection_retries == 0:
+                raise e
+            sleep(1)
             scraper = cloudscraper.create_scraper()
 
 def get_all_dubbed_animes():
