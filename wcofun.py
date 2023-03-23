@@ -129,7 +129,7 @@ def download_episode(episode_url, directory):
     except cloudscraper.exceptions.CloudflareChallengeError:
         return download_episode(episode_url, directory)
     
-    return filename
+    return str(filename)
 
 
 def get_episodes_retry(anime):

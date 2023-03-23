@@ -4,7 +4,7 @@ from multiprocessing import Process
 from multiprocessing.managers import BaseManager
 from functools import partial
 import pathlib
-import sys
+import msvcrt
 
 def mp4_to_mp3_and_delete(mp4_file: str, mp3_folder: pathlib.Path):
     mp4_file_path = pathlib.Path(mp4_file)
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
         episode_downloader = Process(target=ThreadPoolWithLog, args=("EPDOWNLD", log_mp4, log_episodes, partial(download_episode, directory=FOLDER_DOWNLOAD_MP4)))
 
-        mp4_to_mp3_converter = Process(target=ThreadPoolWithLog, args=("MP4TOMP3", log_mp3, log_mp4, partial(mp4_to_mp3_and_delete, mp3_folder=FOLDER_DOWNLOAD_MP3), 10))
+        mp4_to_mp3_converter = Process(target=ThreadPoolWithLog, args=("MP4TOMP3", log_mp3, log_mp4, partial(mp4_to_mp3_and_delete, mp3_folder=FOLDER_DOWNLOAD_MP3), 20))
 
         episode_finder.start()
         episode_downloader.start()
@@ -50,15 +50,19 @@ if __name__ == "__main__":
 
         while True:
             try:
-                continue
+                if msvcrt.kbhit():
+                    if msvcrt.getch() == b'q':
+                        break
+
             except KeyboardInterrupt:
                 break
 
-        episode_finder.terminate()
-        episode_downloader.terminate()
-        mp4_to_mp3_converter.terminate()
-
+        print("Exiting...")
         log_animes.save()
         log_episodes.save()
         log_mp4.save()
         log_mp3.save()
+
+        episode_finder.terminate()
+        episode_downloader.terminate()
+        mp4_to_mp3_converter.terminate()

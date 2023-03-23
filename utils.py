@@ -47,7 +47,6 @@ class Log:
                 "processed": {}, 
                 "errors": {}, 
                 "entries": {}, 
-                "processed_read": {},
             }
 
     def save(self):
@@ -78,21 +77,23 @@ class Log:
             self.log["processed"][key] = value
             del self.log["entries"][key] 
 
-    def get_processed(self) -> dict:
+    def get_processed_values(self) -> list:
         with self.lock:
-            values = [value for value in self.log["processed"].values()]
-            self.log["processed_read"].update(self.log["processed"])
-            self.log["processed"] = {}
-
-            values_unwrapped = []
+            values = self.log["processed"].values()
+            
+            new_values = []
             for value in values:
-                if isinstance(value, list):
-                    values_unwrapped.extend(value)
+                if type(value) == list:
+                    new_values.extend(value)
                 else:
-                    values_unwrapped.append(value)
+                    new_values.append(value)
 
-            return values_unwrapped
+            return new_values
     
+    def get_all_keys(self) -> list:
+        with self.lock:
+            return list(self.log["entries"].keys()) + list(self.log["processed"].keys()) + list(self.log["errors"].keys())
+
     def get_errors(self) -> dict:
         with self.lock:
             return self.log["errors"]
@@ -110,7 +111,7 @@ def ThreadPoolWithLog(console_name: str, log: Log, listen_log: Log,  function: p
         futures = {key: executor.submit(function, key) for key in entries.keys()}
 
         while True:
-            new_items = listen_log.get_processed()
+            new_items = list(set(listen_log.get_processed_values()).difference(log.get_all_keys()))
             log.write_entries(new_items)
             for new_item in new_items:
                 futures[new_item] = executor.submit(function, new_item)
@@ -119,29 +120,20 @@ def ThreadPoolWithLog(console_name: str, log: Log, listen_log: Log,  function: p
                 print(f"{console_name}: Waiting for {len(futures)} futures")
                 sys.stdout.flush()
             
-            try:
-                for key in futures.keys():
-                    future = futures[key]
-                    if future.done():
-                        try:
-                            value = future.result()
-                        except Exception as e:
-                            print(f"{console_name}: Error processing {key}: {e}")
-                            sys.stdout.flush()
-                            log.write_error(key, str(e))
-                            log.save()
-                        else:
-                            log.write_processed(key, value)
-                        #finally:
-                            #del futures[key]
-
-                        print(f"{console_name}: Waiting for {len(futures)} futures")
+            for key in list(futures.keys()):
+                future = futures[key]
+                if future.done():
+                    try:
+                        value = future.result()
+                    except Exception as e:
+                        print(f"{console_name}: Error processing {key}: {e}")
                         sys.stdout.flush()
+                        log.write_error(key, str(e))
+                        log.save()
+                    else:
+                        log.write_processed(key, value)
+                    finally:
+                        del futures[key]
 
-            except Exception as e:
-                print(f"{console_name}: Error: {e}")
-                tb = traceback.format_exc()
-                print("tb:", tb)
-                sys.stdout.flush()
-                log.save()
-                break
+                    print(f"{console_name}: Waiting for {len(futures)} futures")
+                    sys.stdout.flush()
