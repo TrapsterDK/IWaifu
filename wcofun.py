@@ -47,10 +47,10 @@ def get_video_url(episode_url, scraper):
     website_soup = BeautifulSoup(r.text, "html.parser")
 
     # Get the obfuscated script that contains the iframe url
-    iframe_script = website_soup.select_one("div[id*=hide-] + script")
+    iframe_script = website_soup.select_one("div > script")
 
     if iframe_script is None:
-        raise Exception("Could not find iframe script")
+        raise Exception("Could not find iframe script " + r.text)
 
     script = iframe_script.text.replace("document.write", "")
 
@@ -113,7 +113,7 @@ def download_video(video_url, filename, scraper, chunk_size=4096 * 4096):
                 f.flush()
 
 
-def download_episode(episode_url, directory, connection_retries=5):
+def download_episode(episode_url: str, directory: pathlib.Path, connection_retries=5) -> pathlib.Path:
     scraper = cloudscraper.create_scraper()
     while True:
         try:
@@ -124,18 +124,18 @@ def download_episode(episode_url, directory, connection_retries=5):
         except requests.exceptions.ConnectionError as e:
             connection_retries -= 1
             if connection_retries == 0:
-                raise e
+                raise Exception(str(e) + " " + e, connection_retries)
             sleep(1)
             scraper = cloudscraper.create_scraper()
 
-    filename = directory.joinpath(pathlib.Path(episode_url.split("/")[-1] + ".mp4"))
+    filename = directory / (episode_url.split("/")[-1] + ".mp4")
 
     try:
         download_video(video_url, filename, scraper)
     except cloudscraper.exceptions.CloudflareChallengeError or requests.exceptions.ConnectionError:
         return download_episode(episode_url, directory, connection_retries=connection_retries)
     
-    return str(filename)
+    return filename
 
 
 def get_episodes_retry(anime, connection_retries=5):
@@ -149,7 +149,7 @@ def get_episodes_retry(anime, connection_retries=5):
         except requests.exceptions.ConnectionError as e:
             connection_retries -= 1
             if connection_retries == 0:
-                raise e
+                raise Exception(str(e) + " " + e, connection_retries)
             sleep(1)
             scraper = cloudscraper.create_scraper()
 

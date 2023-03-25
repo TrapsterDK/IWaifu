@@ -46,7 +46,9 @@ def file_increment(path: pathlib.Path) -> int:
 
 def file_increment_name(path: pathlib.Path, i: int) -> pathlib.Path:
     return path.with_name(f"{path.stem} ({i}){path.suffix}")
-        
+
+def remove_base_path(path: pathlib.Path) -> str:
+    return str(path.relative_to(BASE_PATH))
 
 
 class Log:
@@ -110,33 +112,28 @@ class Log:
         with open(self.filename_error, "w") as f:
             json.dump(self.log_error, f)
 
-    def write_tasks(self, keys: list[str]):
+    def write_tasks(self, keys: list[str or pathlib.Path]):
         with self.lock:
             for key in keys:
-                assert key not in self.log_error
-                assert key not in self.log
-                assert type(key) is str
+                if isinstance(key, pathlib.Path):
+                    key = remove_base_path(key)
 
                 self.log[key] = None
 
-    def write_task_done(self, key: str, value: Any):
+    def write_task_done(self, key: str or pathlib.Path, value: str or pathlib.Path or list[str or pathlib.Path]):
         with self.lock:
-            assert key in self.log
-            assert self.log[key] is None
-            
-            assert value is not None
-            assert type(value) is list or type(value) is str
+            if isinstance(key, pathlib.Path):
+                key = remove_base_path(key)
+
+            if isinstance(value, pathlib.Path):
+                value = remove_base_path(value)
 
             self.log[key] = value
 
-    def write_error(self, key: str, error: str):
+    def write_error(self, key: str or pathlib.Path, error: str):
         with self.lock:
-            assert key in self.log
-            assert self.log[key] is None
-                
-            assert type(key) is str
-            assert error is not None
-            assert type(error) is str
+            if isinstance(key, pathlib.Path):
+                key = remove_base_path(key)
 
             del self.log[key]
             self.log_error[key] = error
@@ -174,7 +171,7 @@ class Log:
             return list(set(keys).difference(set(self_keys)))
 
 
-def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done: multiprocessing.Value, max_workers=5):
+def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done: multiprocessing.Value, max_workers=10):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     process_name = multiprocessing.current_process().name
@@ -231,4 +228,3 @@ def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done:
         
         # immediately exit the program
         os._exit(0)
-
