@@ -171,7 +171,7 @@ class Log:
             return list(set(keys).difference(set(self_keys)))
 
 
-def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done: multiprocessing.Value, max_workers=10):
+def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done: multiprocessing.Value, max_workers=5):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     process_name = multiprocessing.current_process().name
@@ -182,6 +182,8 @@ def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done:
         keys = write_log.get_none_keys()
         futures = {key: executor.submit(function, key) for key in keys}
         del keys
+        
+        print(f"{process_name}: Waiting for {len(futures)} futures")
     
         last_save = time.time()
 

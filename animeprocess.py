@@ -44,7 +44,6 @@ if __name__ == "__main__":
             Process(target=ThreadPoolRunOnLog, args=(log_animes, log_episodes, get_episodes_retry, done), name="EPS"),
             Process(target=ThreadPoolRunOnLog, args=(log_episodes, log_mp4, partial(download_episode, directory=FOLDER_DOWNLOAD_MP4), done), name="MP4"),
             Process(target=ThreadPoolRunOnLog, args=(log_mp4, log_mp3, partial(mp4_to_mp3_and_delete, mp3_folder=FOLDER_DOWNLOAD_MP3), done), name="MP3"),
-            #Process(target=ThreadPoolRunOnLog, args=(log_mp4, log_wav, partial(mp4_to_wav_and_delete, wav_folder=FOLDER_DOWNLOAD_WAV), done), name="WAV"),
         ]
 
         for process in processess:
