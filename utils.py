@@ -9,7 +9,8 @@ import multiprocessing
 import sys
 import time
 import shutil
-from moviepy.editor import VideoFileClip
+
+# from moviepy.editor import VideoFileClip
 import signal
 
 BASE_PATH = pathlib.Path("D:/iwaifudata/")
@@ -25,17 +26,21 @@ LOG_MP3 = FOLDER_LOGS / "mp3.json"
 MINUTES_SAVE_LOG = 2
 MINUTE = 60
 
+
 def generate_salt() -> bytes:
     return os.urandom(32)
 
+
 def hash_password(plaintext: str, salt: str) -> str:
-    return hashlib.pbkdf2_hmac('sha256', plaintext.encode('utf-8'), salt, 100000)
+    return hashlib.pbkdf2_hmac("sha256", plaintext.encode("utf-8"), salt, 100000)
+
 
 def mp4_to_mp3(mp4_file: pathlib.Path, mp3_file: pathlib.Path):
     video = VideoFileClip(str(mp4_file))
     audio = video.audio
     audio.write_audiofile(str(mp3_file), logger=None)
     video.close()
+
 
 def file_increment(path: pathlib.Path) -> int:
     i = 1
@@ -44,8 +49,10 @@ def file_increment(path: pathlib.Path) -> int:
 
     return i
 
+
 def file_increment_name(path: pathlib.Path, i: int) -> pathlib.Path:
     return path.with_name(f"{path.stem} ({i}){path.suffix}")
+
 
 def remove_base_path(path: pathlib.Path) -> str:
     return str(path.relative_to(BASE_PATH))
@@ -87,19 +94,28 @@ class Log:
             old_log_error = None
 
         # if the log has changed, save the old log and save the new log
-        if (old_log != None and old_log_error != None and 
-            (old_log != self.log or old_log_error != self.log_error)):
+        if (
+            old_log != None
+            and old_log_error != None
+            and (old_log != self.log or old_log_error != self.log_error)
+        ):
             # create the old folder if it doesn't exist
             directory_old = directory / "old"
             directory_old.mkdir(exist_ok=True)
 
             # get the old log file name by finding the highest number in the old folder of the same name
             old_filename_i = file_increment(directory_old / self.filename.name)
-            old_filename_error_i = file_increment(directory_old / self.filename_error.name)
+            old_filename_error_i = file_increment(
+                directory_old / self.filename_error.name
+            )
             max_i = max(old_filename_i, old_filename_error_i)
 
-            old_filename = file_increment_name(directory_old / self.filename.name, max_i)
-            old_filename_error = file_increment_name(directory_old / self.filename_error.name, max_i)
+            old_filename = file_increment_name(
+                directory_old / self.filename.name, max_i
+            )
+            old_filename_error = file_increment_name(
+                directory_old / self.filename_error.name, max_i
+            )
 
             # move the old log to the old folder
             shutil.move(self.filename, old_filename)
@@ -120,7 +136,11 @@ class Log:
 
                 self.log[key] = None
 
-    def write_task_done(self, key: str or pathlib.Path, value: str or pathlib.Path or list[str or pathlib.Path]):
+    def write_task_done(
+        self,
+        key: str or pathlib.Path,
+        value: str or pathlib.Path or list[str or pathlib.Path],
+    ):
         with self.lock:
             if isinstance(key, pathlib.Path):
                 key = remove_base_path(key)
@@ -144,7 +164,7 @@ class Log:
             for value in self.log.values():
                 if value is None:
                     continue
-                
+
                 if type(value) is list:
                     values_unpacked.extend(value)
                     continue
@@ -153,10 +173,12 @@ class Log:
                     values_unpacked.append(value)
                     continue
 
-                raise Exception(f"Unknown value type: {type(value)} {type(value) is list}")
+                raise Exception(
+                    f"Unknown value type: {type(value)} {type(value) is list}"
+                )
 
             return values_unpacked
-        
+
     def get_all_keys(self):
         with self.lock:
             return list(self.log.keys()) + list(self.log_error.keys())
@@ -164,14 +186,20 @@ class Log:
     def get_none_keys(self):
         with self.lock:
             return [key for key, value in self.log.items() if value is None]
-        
+
     def keys_not_in_log(self, keys: list):
         self_keys = self.get_all_keys()
         with self.lock:
             return list(set(keys).difference(set(self_keys)))
 
 
-def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done: multiprocessing.Value, max_workers=5):
+def ThreadPoolRunOnLog(
+    listen_log: Log,
+    write_log: Log,
+    function: partial,
+    done: multiprocessing.Value,
+    max_workers=5,
+):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     process_name = multiprocessing.current_process().name
@@ -182,9 +210,9 @@ def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done:
         keys = write_log.get_none_keys()
         futures = {key: executor.submit(function, key) for key in keys}
         del keys
-        
+
         print(f"{process_name}: Waiting for {len(futures)} futures")
-    
+
         last_save = time.time()
 
         while True:
@@ -196,7 +224,7 @@ def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done:
 
             if len(new_items) > 0:
                 print(f"{process_name}: Waiting for {len(futures)} futures")
-            
+
             # check if the futures are done
             for key in list(futures.keys()):
                 future = futures[key]
@@ -209,13 +237,12 @@ def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done:
                         write_log.write_error(key, str(e))
                         print(f"{process_name}: Error: {e}")
 
-                    
                     print(f"{process_name}: Waiting for {len(futures)} futures")
 
             # check if the program should exit
             if done.value == True:
                 break
-            
+
             time.sleep(1)
 
             # save the log every 2 minutes
@@ -227,6 +254,6 @@ def ThreadPoolRunOnLog(listen_log: Log, write_log: Log, function: partial, done:
         write_log.save()
 
         print(f"Exiting {process_name}")
-        
+
         # immediately exit the program
         os._exit(0)

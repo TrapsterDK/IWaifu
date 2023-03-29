@@ -1,4 +1,16 @@
-from utils import Log, ThreadPoolRunOnLog, FOLDER_DOWNLOAD_MP4, FOLDER_DOWNLOAD_MP3, FOLDER_LOGS, mp4_to_mp3, LOG_ANIMES, LOG_EPISODES, LOG_MP4, LOG_MP3, BASE_PATH
+from utils import (
+    Log,
+    ThreadPoolRunOnLog,
+    FOLDER_DOWNLOAD_MP4,
+    FOLDER_DOWNLOAD_MP3,
+    FOLDER_LOGS,
+    mp4_to_mp3,
+    LOG_ANIMES,
+    LOG_EPISODES,
+    LOG_MP4,
+    LOG_MP3,
+    BASE_PATH,
+)
 from wcofun import download_episode, get_episodes_retry, get_all_dubbed_animes
 from multiprocessing import Process, Value, Pool
 from multiprocessing.managers import BaseManager
@@ -7,14 +19,18 @@ import pathlib
 import sys
 import time
 
+
 def mp4_to_mp3_and_delete(mp4_file: str, mp3_folder: pathlib.Path):
     mp4_file_path = BASE_PATH / mp4_file
-    mp3_file_path = mp3_folder / mp4_file_path.relative_to(FOLDER_DOWNLOAD_MP4).with_suffix(".mp3")
+    mp3_file_path = mp3_folder / mp4_file_path.relative_to(
+        FOLDER_DOWNLOAD_MP4
+    ).with_suffix(".mp3")
     mp4_to_mp3(mp4_file_path, mp3_file_path)
 
     mp4_file_path.unlink()
 
     return mp3_file_path
+
 
 if __name__ == "__main__":
     pathlib.Path(FOLDER_LOGS).mkdir(exist_ok=True)
@@ -41,14 +57,35 @@ if __name__ == "__main__":
             log_animes.save()
 
         processess = [
-            Process(target=ThreadPoolRunOnLog, args=(log_animes, log_episodes, get_episodes_retry, done), name="EPS"),
-            Process(target=ThreadPoolRunOnLog, args=(log_episodes, log_mp4, partial(download_episode, directory=FOLDER_DOWNLOAD_MP4), done), name="MP4"),
-            Process(target=ThreadPoolRunOnLog, args=(log_mp4, log_mp3, partial(mp4_to_mp3_and_delete, mp3_folder=FOLDER_DOWNLOAD_MP3), done), name="MP3"),
+            Process(
+                target=ThreadPoolRunOnLog,
+                args=(log_animes, log_episodes, get_episodes_retry, done),
+                name="EPS",
+            ),
+            Process(
+                target=ThreadPoolRunOnLog,
+                args=(
+                    log_episodes,
+                    log_mp4,
+                    partial(download_episode, directory=FOLDER_DOWNLOAD_MP4),
+                    done,
+                ),
+                name="MP4",
+            ),
+            Process(
+                target=ThreadPoolRunOnLog,
+                args=(
+                    log_mp4,
+                    log_mp3,
+                    partial(mp4_to_mp3_and_delete, mp3_folder=FOLDER_DOWNLOAD_MP3),
+                    done,
+                ),
+                name="MP3",
+            ),
         ]
 
         for process in processess:
             process.start()
-
 
         try:
             while True:
