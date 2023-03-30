@@ -10,18 +10,20 @@ import sys
 import time
 import shutil
 
-# from moviepy.editor import VideoFileClip
+import ffmpeg
 import signal
 
 BASE_PATH = pathlib.Path("D:/iwaifudata/")
 FOLDER_DOWNLOAD_MP4 = BASE_PATH / "mp4"
 FOLDER_DOWNLOAD_MP3 = BASE_PATH / "mp3"
+FOLDER_MONO_MP3 = BASE_PATH / "mono_mp3"
 FOLDER_LOGS = BASE_PATH / "logs"
 
 LOG_ANIMES = FOLDER_LOGS / "animes.json"
 LOG_EPISODES = FOLDER_LOGS / "episodes.json"
 LOG_MP4 = FOLDER_LOGS / "mp4.json"
 LOG_MP3 = FOLDER_LOGS / "mp3.json"
+LOG_MONO_MP3 = FOLDER_LOGS / "mono_mp3.json"
 
 MINUTES_SAVE_LOG = 2
 MINUTE = 60
@@ -36,10 +38,28 @@ def hash_password(plaintext: str, salt: str) -> str:
 
 
 def mp4_to_mp3(mp4_file: pathlib.Path, mp3_file: pathlib.Path):
-    video = VideoFileClip(str(mp4_file))
-    audio = video.audio
-    audio.write_audiofile(str(mp3_file), logger=None)
-    video.close()
+    if mp3_file.exists():
+        return
+
+    mp4_file = str(mp4_file)
+    mp3_file = str(mp3_file)
+
+    stream = ffmpeg.input(mp4_file)
+    stream = ffmpeg.output(stream, mp3_file, acodec="libmp3lame", ac=1, ar="48k")
+    ffmpeg.run(stream, overwrite_output=True, quiet=True)
+
+def mp3_to_mp3_mono(mp3_file: pathlib.Path, mp3_file_mono: pathlib.Path):
+    if mp3_file_mono.exists():
+        return
+
+    mp3_file = str(mp3_file)
+    mp3_file_mono = str(mp3_file_mono)
+
+
+    # change the audio to mono and frequency to 22050
+    stream = ffmpeg.input(mp3_file)
+    stream = ffmpeg.output(stream, mp3_file_mono, acodec="libmp3lame", ac=1, ar="48k")
+    ffmpeg.run(stream, overwrite_output=True, quiet=True)
 
 
 def file_increment(path: pathlib.Path) -> int:
