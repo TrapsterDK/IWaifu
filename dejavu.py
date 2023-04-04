@@ -6,9 +6,7 @@ import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage import maximum_filter
-from scipy.ndimage import (binary_erosion,
-                                      generate_binary_structure,
-                                      iterate_structure)
+from scipy.ndimage import binary_erosion, generate_binary_structure, iterate_structure
 
 CONNECTIVITY_MASK = 2
 DEFAULT_AMP_MIN = 10
@@ -23,12 +21,14 @@ PEAK_NEIGHBORHOOD_SIZE = 10
 PEAK_SORT = True
 
 
-def fingerprint(channel_samples: List[int],
-                Fs: int = DEFAULT_FS,
-                wsize: int = DEFAULT_WINDOW_SIZE,
-                wratio: float = DEFAULT_OVERLAP_RATIO,
-                fan_value: int = DEFAULT_FAN_VALUE,
-                amp_min: int = DEFAULT_AMP_MIN) -> List[Tuple[str, int]]:
+def fingerprint(
+    channel_samples: List[int],
+    Fs: int = DEFAULT_FS,
+    wsize: int = DEFAULT_WINDOW_SIZE,
+    wratio: float = DEFAULT_OVERLAP_RATIO,
+    fan_value: int = DEFAULT_FAN_VALUE,
+    amp_min: int = DEFAULT_AMP_MIN,
+) -> List[Tuple[str, int]]:
     """
     FFT the channel, log transform output, find local maxima, then return locally sensitive hashes.
 
@@ -46,7 +46,8 @@ def fingerprint(channel_samples: List[int],
         NFFT=wsize,
         Fs=Fs,
         window=mlab.window_hanning,
-        noverlap=int(wsize * wratio))[0]
+        noverlap=int(wsize * wratio),
+    )[0]
 
     # Apply log transform since specgram function returns linear array. 0s are excluded to avoid np warning.
     arr2D = 10 * np.log10(arr2D, out=np.zeros_like(arr2D), where=(arr2D != 0))
@@ -57,8 +58,9 @@ def fingerprint(channel_samples: List[int],
     return generate_hashes(local_maxima, fan_value=fan_value)
 
 
-def get_2D_peaks(arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP_MIN)\
-        -> List[Tuple[List[int], List[int]]]:
+def get_2D_peaks(
+    arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP_MIN
+) -> List[Tuple[List[int], List[int]]]:
     """
     Extract maximum peaks from the spectogram matrix (arr2D).
 
@@ -91,8 +93,10 @@ def get_2D_peaks(arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP
     local_max = maximum_filter(arr2D, footprint=neighborhood) == arr2D
 
     # Applying erosion, the dejavu documentation does not talk about this step.
-    background = (arr2D == 0)
-    eroded_background = binary_erosion(background, structure=neighborhood, border_value=1)
+    background = arr2D == 0
+    eroded_background = binary_erosion(
+        background, structure=neighborhood, border_value=1
+    )
 
     # Boolean mask of arr2D with True at peaks (applying XOR on both matrices).
     detected_peaks = local_max != eroded_background
@@ -115,8 +119,8 @@ def get_2D_peaks(arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP
         fig, ax = plt.subplots()
         ax.imshow(arr2D)
         ax.scatter(times_filter, freqs_filter)
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Frequency')
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Frequency")
         ax.set_title("Spectrogram")
         plt.gca().invert_yaxis()
         plt.show()
@@ -124,7 +128,9 @@ def get_2D_peaks(arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP
     return list(zip(freqs_filter, times_filter))
 
 
-def generate_hashes(peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FAN_VALUE) -> List[Tuple[str, int]]:
+def generate_hashes(
+    peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FAN_VALUE
+) -> List[Tuple[str, int]]:
     """
     Hash list structure:
        sha1_hash[0:FINGERPRINT_REDUCTION]    time_offset
@@ -146,7 +152,6 @@ def generate_hashes(peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FAN_V
     for i in range(len(peaks)):
         for j in range(1, fan_value):
             if (i + j) < len(peaks):
-
                 freq1 = peaks[i][idx_freq]
                 freq2 = peaks[i + j][idx_freq]
                 t1 = peaks[i][idx_time]
@@ -154,8 +159,15 @@ def generate_hashes(peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FAN_V
                 t_delta = t2 - t1
 
                 if MIN_HASH_TIME_DELTA <= t_delta <= MAX_HASH_TIME_DELTA:
-                    h = hashlib.sha1(f"{str(freq1)}|{str(freq2)}|{str(t_delta)}".encode('utf-8'))
+                    h = hashlib.sha1(
+                        f"{str(freq1)}|{str(freq2)}|{str(t_delta)}".encode("utf-8")
+                    )
 
-                    hashes.append((h.hexdigest()[0:FINGERPRINT_REDUCTION], t1))
+                    hashes.append(
+                        (
+                            bytes.fromhex(h.hexdigest()[0:FINGERPRINT_REDUCTION]),
+                            int(t1),
+                        )
+                    )
 
     return hashes
