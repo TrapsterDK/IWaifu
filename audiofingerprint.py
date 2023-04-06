@@ -28,7 +28,7 @@ def process_audio_files(
             count = 0
             for audio in audios:
                 # max 120 minutes in queue
-                while audio_queue.qsize() > 12:
+                while audio_queue.qsize() > 60:
                     sleep(5)
 
                 # check if file is already processeds
@@ -107,10 +107,10 @@ def process_fingerprint(
 
             file_name, audio = data
 
+            print(f"Fingerprinting audio {count}")
+
             # get audio fingerprint
             audio_fingerprint = dejavu.fingerprint(audio)
-
-            print(f"Fingerprinting audio {count}")
 
             # add audio fingerprint to queue
             fingerprint_queue.put((file_name, audio_fingerprint))
@@ -156,23 +156,6 @@ def process_database(fingerprint_queue: "Queue[tuple[str, list[tuple[bytes, int]
         print("Keyboard interrupt, terminating database process")
 
 
-with FingerPrintDatabase() as fingerprint_db:
-    fingerprint_db.delete_tables()
-    fingerprint_db.create_tables()
-
-    audio = pydub.AudioSegment.from_file(
-        constants.FOLDER_MONO_MP3
-        / "tengen-toppa-gurren-lagann-parallel-works-episode-1-english-dubbed.mp3",
-        "mp3",
-    )
-
-    audio_fingerprint = dejavu.fingerprint(audio.get_array_of_samples())
-
-    fingerprint_db.insert_fingerprints(1, audio_fingerprint)
-    fingerprint_db.insert_fingerprints(1, audio_fingerprint)
-
-exit()
-
 if __name__ == "__main__":
     print("Starting")
 
@@ -196,7 +179,6 @@ if __name__ == "__main__":
         process.start()
 
     try:
-        print("Waiting for processes to finish")
         for process in processes:
             process.join()
 
