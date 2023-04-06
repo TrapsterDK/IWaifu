@@ -1,187 +1,209 @@
+from time import sleep
 import dejavu
 import pydub
+import constants
+from multiprocessing import Queue, Process
 from pathlib import Path
-from database import ThreadSafeDB
-from multiprocessing import Pool
-from multiprocessing.managers import BaseManager
-import tqdm
-from functools import partial
 import signal
-import platform
+from databases import VoiceAudioDatabase, FingerPrintDatabase
 
 
-class FingerPrintDatabase(ThreadSafeDB):
-    def __init__(
-        self, db_file: Path, backup_dir: Path = None, backup_interval_ms: int = 3600
-    ):
-        super().__init__(db_file, backup_dir, backup_interval_ms)
-        # https://www.sqlite.org/pragma.html#pragma_synchronous
-        self.con.execute("""PRAGMA synchronous = OFF""")
-        self.con.execute("""PRAGMA cache_size = 1000000""")
-        self.con.execute("""PRAGMA locking_mode = EXCLUSIVE""")
-        self.con.execute("""PRAGMA temp_store = MEMORY""")
-
-    def create_tables(self):
-        self.con.execute(
-            """CREATE TABLE IF NOT EXISTS fingerprints (
-            hash BLOB NOT NULL,
-            audio_id INTEGER NOT NULL,
-            offset INTEGER NOT NULL,
-            PRIMARY KEY (hash, audio_id, offset)
-        )"""
-        )
-
-        self.con.execute(
-            """CREATE TABLE IF NOT EXISTS audios (
-            audio_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            audio_name TEXT NOT NULL UNIQUE,
-            fingerprinted BOOLEAN NOT NULL DEFAULT 0
-        )"""
-        )
-
-        self.con.execute(
-            """CREATE INDEX IF NOT EXISTS hash_index ON fingerprints (hash)"""
-        )
-
-    def insert_fingerprint(self, hash: bytes, offset_s: int, audio_id: int):
-        self.insert_fingerprints([(hash, offset_s)], audio_id)
-
-    def insert_fingerprints(self, hashes: list[tuple[bytes, int]], audio_id: int):
-        c = self.con.cursor()
-
-        with self.write_lock:
-            c.executemany(
-                "INSERT INTO fingerprints VALUES (?, ?, ?)",
-                [(hash, audio_id, offset) for hash, offset in hashes],
-            )
-            self.con.commit()
-
-    def insert_audio(self, audio_name: str) -> int:
-        c = self.con.cursor()
-
-        c.execute("SELECT audio_id FROM audios WHERE audio_name = ?", (audio_name,))
-        fetch = c.fetchone()
-        if fetch is not None:
-            return fetch["audio_id"]
-
-        with self.write_lock:
-            c.execute("INSERT INTO audios (audio_name) VALUES (?)", (audio_name,))
-            self.con.commit()
-
-        return c.lastrowid
-
-    def audio_set_fingerprinted(self, audio_id: int):
-        c = self.con.cursor()
-
-        with self.write_lock:
-            c.execute(
-                "UPDATE audios SET fingerprinted = 1 WHERE audio_id = ?", (audio_id,)
-            )
-            self.con.commit()
-
-    def audio_is_fingerprinted(self, audio_name: str) -> bool:
-        c = self.con.cursor()
-
-        c.execute(
-            "SELECT fingerprinted FROM audios WHERE audio_name = ?", (audio_name,)
-        )
-        fetch = c.fetchone()
-
-        if fetch is None:
-            return False
-
-        return fetch["fingerprinted"] == 1
+MINUTES_TO_SECONDS = 60
+MILISECONDS_TO_SECONDS = 1000
+MAX_FINGERPRINT_MINUTE_SIZE = 10
 
 
-def fingerprint_file(file: Path, db: FingerPrintDatabase):
-    if not file.is_file():
-        return
+def process_audio_files(
+    audio_path: Path,
+    audio_filetype: str,
+    audio_queue: "Queue[tuple[str, pydub.AudioSegment]]",
+):
+    try:
+        print("Audio process started")
 
-    if db.audio_is_fingerprinted(file.name):
-        return
+        with VoiceAudioDatabase() as voice_db, FingerPrintDatabase() as fingerprint_db:
+            audios = voice_db.get_audios()
+            audios_len = len(audios)
 
-    audio_id = db.insert_audio(file.name)
+            count = 0
+            for audio in audios:
+                # max 120 minutes in queue
+                while audio_queue.qsize() > 12:
+                    sleep(5)
 
-    audio = pydub.AudioSegment.from_file(file, file.suffix[1:])
+                # check if file is already processeds
+                audio_id = fingerprint_db.get_audio_id(audio["audio_name"])
+                if audio_id and fingerprint_db.audio_is_fingerprinted(audio_id):
+                    audios_len -= 1
+                    continue
 
-    hashes = dejavu.fingerprint(audio.get_array_of_samples())
+                count += 1
 
-    db.insert_fingerprints(hashes, audio_id)
+                print(f"Processing audio {count}/{audios_len}")
 
-    db.audio_set_fingerprinted(audio_id)
+                # load audio file
+                audio_segment = pydub.AudioSegment.from_file(
+                    audio_path / f"{audio['audio_name']}.{audio_filetype}",
+                    audio_filetype,
+                )
+
+                # get voice activity
+                voice_activity = voice_db.get_voice_activity_processed(
+                    audio["audio_id"]
+                )
+
+                # create new audio segment
+                new_audio = pydub.AudioSegment.empty()
+
+                # add voice activity to new audio segment
+                for activity in voice_activity:
+                    new_audio += audio_segment[
+                        activity["start_time"]
+                        * MILISECONDS_TO_SECONDS : activity["end_time"]
+                        * MILISECONDS_TO_SECONDS
+                    ]
+
+                # add to queue in chunks
+                for i in range(
+                    0,
+                    len(new_audio),
+                    MAX_FINGERPRINT_MINUTE_SIZE
+                    * MINUTES_TO_SECONDS
+                    * MILISECONDS_TO_SECONDS,
+                ):
+                    audio_queue.put(
+                        (
+                            audio["audio_name"],
+                            new_audio[
+                                i : i
+                                + MAX_FINGERPRINT_MINUTE_SIZE
+                                * MINUTES_TO_SECONDS
+                                * MILISECONDS_TO_SECONDS
+                            ].get_array_of_samples(),
+                        )
+                    )
+
+        audio_queue.put(None)
+        print("Audio process finished")
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt, terminating audio process")
 
 
-def init_worker():
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
+def process_fingerprint(
+    audio_queue: "Queue[tuple[str, pydub.AudioSegment]]",
+    fingerprint_queue: "Queue[tuple[str, list[tuple[bytes, int]]]]",
+):
+    try:
+        print("Fingerprint process started")
+
+        count = 0
+        while True:
+            count += 1
+            data = audio_queue.get()
+
+            if data is None:
+                break
+
+            file_name, audio = data
+
+            # get audio fingerprint
+            audio_fingerprint = dejavu.fingerprint(audio)
+
+            print(f"Fingerprinting audio {count}")
+
+            # add audio fingerprint to queue
+            fingerprint_queue.put((file_name, audio_fingerprint))
+
+        fingerprint_queue.put(None)
+        print("Fingerprint process finished")
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt, terminating fingerprint process")
 
 
-def fingerprint_folder(folder: Path, database_manager: FingerPrintDatabase):
-    folders_len = len(list(folder.iterdir()))
+def process_database(fingerprint_queue: "Queue[tuple[str, list[tuple[bytes, int]]]]"):
+    try:
+        print("Database process started")
 
-    print(f"Fingerprinting {folders_len} files")
+        with FingerPrintDatabase() as fingerprint_db:
+            count = 0
+            while True:
+                count += 1
+                data = fingerprint_queue.get()
 
-    with Pool(2, initializer=init_worker) as pool:
-        try:
-            for _ in tqdm.tqdm(
-                pool.imap_unordered(
-                    partial(fingerprint_file, db=database_manager), folder.iterdir()
-                ),
-                total=folders_len,
-            ):
-                pass
+                if data is None:
+                    break
 
-        except KeyboardInterrupt:
-            print("Caught KeyboardInterrupt, terminating workers")
-            pool.terminate()
-            pool.join()
-        else:
-            print("Fingerprinting done")
-            pool.close()
+                print(f"Inserting audio {count} into database")
 
+                file_name, audio_fingerprint = data
 
-def fingerprint_folder_single_threaded(folder: Path, db: FingerPrintDatabase):
-    folders_len = len(list(folder.iterdir()))
+                # get audio id
+                audio_id = fingerprint_db.get_audio_id(file_name)
+                if audio_id is None:
+                    audio_id = fingerprint_db.insert_audio(file_name)
 
-    print(f"Fingerprinting {folders_len} files")
+                # insert audio fingerprint into database
+                fingerprint_db.insert_fingerprints(audio_id, audio_fingerprint)
 
-    for file in tqdm.tqdm(folder.iterdir(), total=folders_len):
-        fingerprint_file(file, db)
+                # set audio fingerprinted
+                fingerprint_db.audio_set_fingerprinted(audio_id)
 
-    print("Fingerprinting done")
+        print("Database process finished")
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt, terminating database process")
 
 
-# multthreaded fingerprinting
+with FingerPrintDatabase() as fingerprint_db:
+    fingerprint_db.delete_tables()
+    fingerprint_db.create_tables()
+
+    audio = pydub.AudioSegment.from_file(
+        constants.FOLDER_MONO_MP3
+        / "tengen-toppa-gurren-lagann-parallel-works-episode-1-english-dubbed.mp3",
+        "mp3",
+    )
+
+    audio_fingerprint = dejavu.fingerprint(audio.get_array_of_samples())
+
+    fingerprint_db.insert_fingerprints(1, audio_fingerprint)
+    fingerprint_db.insert_fingerprints(1, audio_fingerprint)
+
+exit()
+
 if __name__ == "__main__":
-    MULTITHREADED = False
-    print(f"Multithreaded: {MULTITHREADED}")
+    print("Starting")
 
-    if platform.uname().system == "Windows":
-        db_path = Path("D:/iwaifudata/audio_fingerprints.db")
-        backup_dir = Path("D:/iwaifudata/backup/audio_fingerprints")
-        mp3_dir = Path("D:/iwaifudata/mono_mp3")
-    else:
-        db_path = Path("/mnt/d/iwaifudata/audio_fingerprints.db")
-        backup_dir = Path("/mnt/d/iwaifudata/backup/audio_fingerprints")
-        mp3_dir = Path("/mnt/d/iwaifudata/mono_mp3")
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-    if MULTITHREADED:
-        BaseManager.register("FingerPrintDatabase", FingerPrintDatabase)
+    audio_queue, fingerprint_queue = (
+        Queue(),
+        Queue(),
+    )
 
-        with BaseManager() as manager:
-            db = manager.FingerPrintDatabase(
-                db_path,
-                backup_dir,
-            )
+    processes = [
+        Process(
+            target=process_audio_files,
+            args=(constants.FOLDER_MONO_MP3, "mp3", audio_queue),
+        ),
+        Process(target=process_fingerprint, args=(audio_queue, fingerprint_queue)),
+        Process(target=process_database, args=(fingerprint_queue,)),
+    ]
 
-            fingerprint_folder(mp3_dir, db)
+    for process in processes:
+        process.start()
 
-            db.close()
-    else:
-        with FingerPrintDatabase(
-            db_path,
-            backup_dir,
-        ) as db:
-            try:
-                fingerprint_folder_single_threaded(mp3_dir, db)
-            except KeyboardInterrupt:
-                print("Caught KeyboardInterrupt")
+    try:
+        print("Waiting for processes to finish")
+        for process in processes:
+            process.join()
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt, terminating processes")
+
+        for process in processes:
+            process.terminate()
+
+    print("Finished")

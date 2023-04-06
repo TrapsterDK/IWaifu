@@ -1,23 +1,27 @@
-import hashlib
+import uuid
 from operator import itemgetter
 from typing import List, Tuple
 
+import base64
 import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.ndimage import maximum_filter
-from scipy.ndimage import binary_erosion, generate_binary_structure, iterate_structure
+from scipy.ndimage import (
+    binary_erosion,
+    generate_binary_structure,
+    iterate_structure,
+    maximum_filter,
+)
 
 CONNECTIVITY_MASK = 2
 DEFAULT_AMP_MIN = 10
-DEFAULT_FAN_VALUE = 5
+DEFAULT_FAN_VALUE = 3
 DEFAULT_FS = 44100
 DEFAULT_OVERLAP_RATIO = 0.5
 DEFAULT_WINDOW_SIZE = 4096
-FINGERPRINT_REDUCTION = 20
 MAX_HASH_TIME_DELTA = 200
 MIN_HASH_TIME_DELTA = 0
-PEAK_NEIGHBORHOOD_SIZE = 10
+PEAK_NEIGHBORHOOD_SIZE = 20
 PEAK_SORT = True
 
 
@@ -31,7 +35,6 @@ def fingerprint(
 ) -> List[Tuple[str, int]]:
     """
     FFT the channel, log transform output, find local maxima, then return locally sensitive hashes.
-
     :param channel_samples: channel samples to fingerprint.
     :param Fs: audio sampling rate.
     :param wsize: FFT windows size.
@@ -63,7 +66,6 @@ def get_2D_peaks(
 ) -> List[Tuple[List[int], List[int]]]:
     """
     Extract maximum peaks from the spectogram matrix (arr2D).
-
     :param arr2D: matrix representing the spectogram.
     :param plot: for plotting the results.
     :param amp_min: minimum amplitude in spectrogram in order to be considered a peak.
@@ -135,7 +137,6 @@ def generate_hashes(
     Hash list structure:
        sha1_hash[0:FINGERPRINT_REDUCTION]    time_offset
         [(e05b341a9b77a51fd26, 32), ... ]
-
     :param peaks: list of peak frequencies and times.
     :param fan_value: degree to which a fingerprint can be paired with its neighbors.
     :return: a list of hashes with their corresponding offsets.
@@ -159,13 +160,13 @@ def generate_hashes(
                 t_delta = t2 - t1
 
                 if MIN_HASH_TIME_DELTA <= t_delta <= MAX_HASH_TIME_DELTA:
-                    h = hashlib.sha1(
-                        f"{str(freq1)}|{str(freq2)}|{str(t_delta)}".encode("utf-8")
-                    )
-
                     hashes.append(
                         (
-                            bytes.fromhex(h.hexdigest()[0:FINGERPRINT_REDUCTION]),
+                            str(
+                                uuid.uuid3(
+                                    uuid.NAMESPACE_DNS, str((freq1, freq2, t_delta))
+                                )
+                            ),
                             int(t1),
                         )
                     )
