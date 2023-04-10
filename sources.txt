@@ -29,3 +29,6 @@ https://www.assemblyai.com/blog/how-to-run-openais-whisper-speech-recognition-mo
 Anime
 https://www.wcostream.net/
 https://www.randomanime.org/
+
+LLM vector db and memory
+https://towardsdatascience.com/building-llms-powered-apps-with-opl-stack-c1d31b17110f

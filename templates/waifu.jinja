@@ -1,103 +1,112 @@
-{% extends "base.jinja" %} 
-{% block content %}
-<!--https://github.com/pixijs/pixijs-->
-<!--https://github.com/guansss/pixi-live2d-display-->
+{% extends "base.jinja" %}
+{% block head %}
+<!--face detection-->
+<script src="https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="{{ url_for('static', filename='js/facedetection.js') }}"></script>
 
+<!--live2d-->
 <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.2/dist/browser/pixi.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/index.min.js"></script>
+{% endblock %}
+{% block content %}
 
 <canvas id=canvas></canvas>
-<video id = "videoID" width="720" height="560" autoplay muted></video>
 
 <script>
+    //https://github.com/pixijs/pixijs
+    //https://github.com/guansss/pixi-live2d-display
     const cubism2Model =
-    "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/shizuku/shizuku.model.json";
+        "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/shizuku/shizuku.model.json";
     const cubism4Model =
-    "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json";
+        "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json";
 
     (async function main() {
-    const app = new PIXI.Application({
-        view: document.getElementById("canvas"),
-        autoStart: true,
-        resizeTo: window
-    });
+        const app = new PIXI.Application({
+            view: document.getElementById("canvas"),
+            autoStart: true,
+            resizeTo: window
+        });
 
-    const model2 = await PIXI.live2d.Live2DModel.from(cubism2Model);
-    const model4 = await PIXI.live2d.Live2DModel.from(cubism4Model);
+        const model1 = await PIXI.live2d.Live2DModel.from(cubism4Model, { autoInteract: false });
+        //const model2 = await PIXI.live2d.Live2DModel.from(cubism2Model, { autoInteract: false });
 
-    app.stage.addChild(model2);
-    app.stage.addChild(model4);
+        app.stage.addChild(model1);
+        //app.stage.addChild(model2);
 
-    model2.scale.set(0.3);
-    model4.scale.set(0.25);
+        model1.scale.set(0.2);
+        //model2.scale.set(0.25);
 
-    model4.x = 300;
+        model1.x = 300;
+        //model2.x = 400;
+
+        function getModelHeadBounds(model) {
+            const areas = model.internalModel.hitAreas
+
+            // check if head or Head exists
+            head = areas["head"] ?? areas["Head"]
+            if (head == undefined) {
+                console.log("no head found")
+                return
+            }
+
+            // https://github.com/guansss/pixi-live2d-display/blob/7d20ff713c28e3e8f263196b33ccc8f7cf3ad1a0/src/cubism-common/InternalModel.ts#L212
+            const bounds = model.internalModel.getDrawableBounds(head.index);
+
+            return bounds;
+        }
+
+        function transformBounds(bounds, model) {
+            const transform = model.localTransform;
+            bounds.x = bounds.x * transform.a + transform.tx;
+            bounds.y = bounds.y * transform.d + transform.ty;
+            bounds.width = bounds.width * transform.a;
+            bounds.height = bounds.height * transform.d;
+
+            return bounds;
+        }
+
+        // mild face following
+        window.face_callback = () => {
+            // convert face coordinates to screen coordinates
+            // x = window.face_coordinates.x * app.screen.width;
+            // y = window.face_coordinates.y * app.screen.height;
+            let bounds = getModelHeadBounds(model1)
+
+            if (bounds == undefined) {
+                return
+            }
+
+            bounds = transformBounds(bounds, model1)
+
+            let headcenter = new PIXI.Point(
+                bounds.x + bounds.width / 2,
+                bounds.y + bounds.height / 2
+            )
+
+            let movement = new PIXI.Point(
+                (window.face_coordinates.x * bounds.width - bounds.width / 2),
+                (window.face_coordinates.y * bounds.height - bounds.height / 2),
+            )
+
+            let canvaspos = new PIXI.Point(
+                headcenter.x + movement.x,
+                headcenter.y + movement.y
+            )
+
+            console.log(canvaspos)
+            model1.focus(canvaspos.x, canvaspos.y);
+        }
     })();
 </script>
 
-<script src="{{ url_for('static', filename='js/pico.js') }}"></script>
-<script>
-    const video = document.getElementById('videoID');
-    
-    function startVideo() {
-        if (navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ audio: false, video: {facingMode: 'user'} })
-                .then(function (stream) {
-                    video.srcObject = stream;
-                    console.log("Video started");
-                })
-                .catch(function (error) {
-                    console.log("Something went wrong!");
-                });
-        }
-    }
-
-    startVideo();
+<!--face detection-->
+<!--
+<video id="video" autoplay muted playsinline hidden style="display: none;"></video>
+-->
+<video id="video" autoplay muted playsinline></video>
 
 
-    //https://github.com/nenadmarkus/picojs/blob/master/examples/webcam.html
-    var update_memory = pico.instantiate_detection_memory(5); // we will use the detecions of the last 5 frames
-    var facefinder_classify_region = function(r, c, s, pixels, ldim) {return -1.0;};
-    var cascadeurl = 'https://raw.githubusercontent.com/nenadmarkus/pico/c2e81f9d23cc11d1a612fd21e4f9de0921a5d0d9/rnt/cascades/facefinder';
-    fetch(cascadeurl).then(function(response) {
-        response.arrayBuffer().then(function(buffer) {
-            var bytes = new Int8Array(buffer);
-            facefinder_classify_region = pico.unpack_cascade(bytes);
-            console.log('* facefinder loaded');
-        })
-    })
-
-    function rgba_to_grayscale(rgba, nrows, ncols) {
-        var gray = new Uint8Array(nrows*ncols);
-        for(var r=0; r<nrows; ++r)
-            for(var c=0; c<ncols; ++c)
-                // gray = 0.2*red + 0.7*green + 0.1*blue
-                gray[r*ncols+c] = (2*rgba[r*4*ncols+4*c+0] + 7*rgba[r*4*ncols+4*c+1] + 1*rgba[r*4*ncols+4*c+2])/10;
-        return gray;
-    }
-
-    function detect_faces() {
-        var params = {
-            shiftfactor: 0.1, // move the detection window by 10% of its size
-            minsize: 20,     // minimum size of a face
-            maxsize: 1000,    // maximum size of a face
-            scalefactor: 1.1  // for multiscale processing: resize the detection window by 10% when moving to the higher scale
-        };
-
-        let image = document.getElementById('videoID');
-        var gray = rgba_to_grayscale(image, image.height, image.width);
-        var rects = pico.run_cascade(gray, facefinder_classify_region, params);
-
-        console.log(rects);
-    }
-
-    function processfn() {
-        detect_faces();
-    }
-
-    setInterval(processfn, 1000);
-</script>
 
 {% endblock %}

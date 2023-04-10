@@ -1,3 +1,5 @@
+# https://github.com/worldveil/dejavu
+
 from time import sleep
 import dejavu
 import pydub
@@ -6,6 +8,7 @@ from multiprocessing import Queue, Process
 from pathlib import Path
 import signal
 from databases import VoiceAudioDatabase, FingerPrintDatabase
+from concurrent.futures import ThreadPoolExecutor
 
 
 MINUTES_TO_SECONDS = 60
@@ -27,9 +30,9 @@ def process_audio_files(
 
             count = 0
             for audio in audios:
-                # max 120 minutes in queue
-                while audio_queue.qsize() > 60:
-                    sleep(5)
+                # max 100 minutes in queue
+                while audio_queue.qsize() > 10:
+                    sleep(1)
 
                 # check if file is already processeds
                 audio_id = fingerprint_db.get_audio_id(audio["audio_name"])
@@ -46,6 +49,9 @@ def process_audio_files(
                     audio_path / f"{audio['audio_name']}.{audio_filetype}",
                     audio_filetype,
                 )
+
+                # convert to mono
+                audio_segment = audio_segment.set_channels(1)
 
                 # get voice activity
                 voice_activity = voice_db.get_voice_activity_processed(
@@ -122,11 +128,27 @@ def process_fingerprint(
         print("Keyboard interrupt, terminating fingerprint process")
 
 
+def database_thread(data: tuple[str, list[tuple[bytes, int]]]) -> None:
+    file_name, audio_fingerprint = data
+
+    with FingerPrintDatabase() as fingerprint_db:
+        # get audio id
+        audio_id = fingerprint_db.get_audio_id(file_name)
+        if audio_id is None:
+            audio_id = fingerprint_db.insert_audio(file_name)
+
+        # insert audio fingerprint into database
+        fingerprint_db.insert_fingerprints(audio_id, audio_fingerprint)
+
+        # set audio fingerprinted
+        fingerprint_db.audio_set_fingerprinted(audio_id)
+
+
 def process_database(fingerprint_queue: "Queue[tuple[str, list[tuple[bytes, int]]]]"):
     try:
         print("Database process started")
 
-        with FingerPrintDatabase() as fingerprint_db:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             count = 0
             while True:
                 count += 1
@@ -135,26 +157,64 @@ def process_database(fingerprint_queue: "Queue[tuple[str, list[tuple[bytes, int]
                 if data is None:
                     break
 
-                print(f"Inserting audio {count} into database")
+                print(f"Inserting fingerprint {count}")
 
-                file_name, audio_fingerprint = data
+                # add to thread pool to insert into database
+                executor.submit(database_thread, data)
 
-                # get audio id
-                audio_id = fingerprint_db.get_audio_id(file_name)
-                if audio_id is None:
-                    audio_id = fingerprint_db.insert_audio(file_name)
-
-                # insert audio fingerprint into database
-                fingerprint_db.insert_fingerprints(audio_id, audio_fingerprint)
-
-                # set audio fingerprinted
-                fingerprint_db.audio_set_fingerprinted(audio_id)
-
-        print("Database process finished")
+            print("Database process finished")
 
     except KeyboardInterrupt:
         print("Keyboard interrupt, terminating database process")
 
+
+def run(i):
+    with FingerPrintDatabase() as fingerprint_db:
+        fingerprint_db.find_matches(i)
+
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+
+# print("Starting")
+# s = time.perf_counter()
+#
+# try:
+#     with ThreadPoolExecutor(max_workers=15) as executor:
+#         futures = []
+#         for i in range(1, 60):
+#             futures.append(executor.submit(run, i))
+#
+#         for future in as_completed(futures):
+#             elapsed = time.perf_counter() - s
+#             print(f"Finished in {elapsed:0.2f} seconds")
+#
+# except KeyboardInterrupt:
+#     print("Keyboard interrupt, terminating processes")
+#
+# print("Finished, in", time.perf_counter() - s, "seconds")
+
+s = time.perf_counter()
+
+with FingerPrintDatabase() as fingerprint_db:
+    matches = fingerprint_db.find_matches(1)
+
+    elapsed = time.perf_counter() - s
+    print(f"Finished in {elapsed:0.2f} seconds")
+
+    # find streaks where offset is countinuous and the id is the same
+    streaks = []
+    for i in range(len(matches) - 1):
+        if (
+            matches[i]["id"] == matches[i + 1]["id"]
+            and matches[i]["offset"] + 1 == matches[i + 1]["offset"]
+        ):
+            streaks.append(matches[i])
+
+    print(streaks)
+
+
+exit()
 
 if __name__ == "__main__":
     print("Starting")
@@ -169,7 +229,7 @@ if __name__ == "__main__":
     processes = [
         Process(
             target=process_audio_files,
-            args=(constants.FOLDER_MONO_MP3, "mp3", audio_queue),
+            args=(constants.FOLDER_MP3, "mp3", audio_queue),
         ),
         Process(target=process_fingerprint, args=(audio_queue, fingerprint_queue)),
         Process(target=process_database, args=(fingerprint_queue,)),
@@ -181,6 +241,11 @@ if __name__ == "__main__":
     try:
         for process in processes:
             process.join()
+
+        with FingerPrintDatabase() as fingerprint_db:
+            fingerprint_db.create_indexes()
+            fingerprint_db.alter_forgien_key()
+            fingerprint_db.alter_unique()
 
     except KeyboardInterrupt:
         print("Keyboard interrupt, terminating processes")

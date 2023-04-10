@@ -241,10 +241,10 @@ class FingerPrintDatabase:
 
         c.execute(
             """CREATE TABLE IF NOT EXISTS fingerprints (
+                id SERIAL PRIMARY KEY,
                 hash UUID NOT NULL,
                 audio_id INTEGER NOT NULL,
-                offset_time INTEGER NOT NULL,
-                UNIQUE (hash, audio_id, offset_time)
+                offset_time INTEGER NOT NULL
             )"""
         )
 
@@ -257,7 +257,7 @@ class FingerPrintDatabase:
 
         self.con.commit()
 
-    def drop_index(self) -> None:
+    def drop_indexes(self) -> None:
         c = self.con.cursor()
 
         c.execute("DROP INDEX IF EXISTS hash_index")
@@ -280,25 +280,11 @@ class FingerPrintDatabase:
         file.seek(0)
 
         # copy from if collison use psycopg2.extras.execute_values
-        try:
-            c.copy_from(
-                file,
-                "fingerprints",
-                columns=("hash", "offset_time", "audio_id"),
-            )
-        except UniqueViolation:
-            # if there is a collision rollback and use psycopg2.extras.execute_values
-            # which is slower but has on conflict do nothing, chance of collision is very low
-            print("Database copy collision")
-            c.execute("ROLLBACK")
-
-            psycopg2extras.execute_values(
-                c,
-                """INSERT INTO fingerprints (hash, offset_time, audio_id)
-                VALUES %s
-                ON CONFLICT DO NOTHING""",
-                [(*fingerprint, audio_id) for fingerprint in fingerprints],
-            )
+        c.copy_from(
+            file,
+            "fingerprints",
+            columns=("hash", "offset_time", "audio_id"),
+        )
 
         self.con.commit()
 
@@ -355,10 +341,192 @@ class FingerPrintDatabase:
 
         return c.fetchone()["fingerprinted"]
 
-    def delete_tables(self) -> None:
+    def create_indexes(self) -> None:
         c = self.con.cursor()
 
-        c.execute("DROP TABLE IF EXISTS fingerprints")
-        c.execute("DROP TABLE IF EXISTS audios")
+        c.execute("CREATE INDEX IF NOT EXISTS hash_index ON fingerprints (hash)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS audio_id_index ON fingerprints (audio_id)"
+        )
+
+        self.con.commit()
+
+    def alter_unique(self) -> None:
+        c = self.con.cursor()
+
+        self.con.commit()
+
+        # remove duplicates from fingerprints efficiently
+        c.execute(
+            """DELETE FROM fingerprints
+            WHERE id IN (
+                SELECT id
+                FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY hash, audio_id, offset_time ORDER BY id) AS rnum
+                    FROM fingerprints
+                ) t
+                WHERE t.rnum > 1
+            )"""
+        )
+
+        # add unique constraint
+        c.execute("ALTER TABLE fingerprints ADD UNIQUE (hash, audio_id, offset_time)")
+
+        self.con.commit()
+
+    def alter_forgien_key(self) -> None:
+        c = self.con.cursor()
+
+        c.execute(
+            "ALTER TABLE fingerprints ADD FOREIGN KEY (audio_id) REFERENCES audios (audio_id) ON DELETE CASCADE"
+        )
+
+        self.con.commit()
+
+    # finds hashes that have the same hash as the audio id,
+    # ignores any audio with lower id than the audio id
+    def find_matches(self, audio_id: int) -> list[tuple[int, int]]:
+        c = self.con.cursor()
+
+        c.execute(
+            """SELECT audio_id, offset_time
+            FROM fingerprints
+            WHERE hash IN (
+                SELECT hash
+                FROM fingerprints
+                WHERE audio_id = %s
+            )
+            AND audio_id > %s
+            ORDER BY audio_id, offset_time""",
+            (audio_id, audio_id),
+        )
+
+        return c.fetchall()
+
+
+class SpeakerDatabase:
+    def __init__(self) -> None:
+        self.con = psycopg2.connect(
+            host=IP,
+            database="speakerdiarization",
+            user="postgres",
+            password="root",
+            cursor_factory=psycopg2extras.DictCursor,
+        )
+
+        self.create_tables()
+
+    def close(self) -> None:
+        self.con.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def create_tables(self) -> None:
+        c = self.con.cursor()
+
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS audios (
+                audio_id SERIAL PRIMARY KEY,
+                audio_name VARCHAR(128) NOT NULL UNIQUE,
+                dialized BOOLEAN NOT NULL DEFAULT FALSE
+            )"""
+        )
+
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS dialization (
+                id SERIAL PRIMARY KEY,
+                audio_id INTEGER NOT NULL,
+                speaker_id INTEGER NOT NULL,
+                start_time INTEGER NOT NULL,
+                end_time INTEGER NOT NULL,
+
+                CONSTRAINT fk_audio_id
+                    FOREIGN KEY (audio_id)
+                    REFERENCES audios (audio_id)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE
+            )"""
+        )
+
+        self.con.commit()
+
+    def insert_audio(self, audio_name: str) -> int:
+        c = self.con.cursor()
+
+        c.execute(
+            """INSERT INTO audios (audio_name)
+            VALUES (%s)
+            RETURNING audio_id""",
+            (audio_name,),
+        )
+
+        self.con.commit()
+
+        return c.fetchone()["audio_id"]
+
+    def get_audio_id(self, audio_name: str) -> int:
+        c = self.con.cursor()
+
+        c.execute(
+            """SELECT audio_id
+            FROM audios
+            WHERE audio_name = %s""",
+            (audio_name,),
+        )
+
+        if c.rowcount == 0:
+            return None
+
+        return c.fetchone()["audio_id"]
+
+    def audio_is_diarized(self, audio_id: int) -> bool:
+        c = self.con.cursor()
+
+        c.execute(
+            """SELECT dialized
+            FROM audios
+            WHERE audio_id = %s""",
+            (audio_id,),
+        )
+
+        return c.fetchone()["dialized"]
+
+    def audio_set_dialized(self, audio_id: int) -> None:
+        c = self.con.cursor()
+
+        c.execute(
+            """UPDATE audios
+            SET dialized = True
+            WHERE audio_id = %s""",
+            (audio_id,),
+        )
+
+        self.con.commit()
+
+    def delete_diarization(self, audio_id: int) -> None:
+        c = self.con.cursor()
+
+        c.execute(
+            """DELETE FROM dialization
+            WHERE audio_id = %s""",
+            (audio_id,),
+        )
+
+        self.con.commit()
+
+    def insert_speaker_diarization(
+        self, audio_id: int, diarization: list[int, float, float]
+    ) -> None:
+        c = self.con.cursor()
+
+        c.executemany(
+            """INSERT INTO dialization (audio_id, speaker_id, start_time, end_time)
+            VALUES (%s, %s, %s, %s)""",
+            [(audio_id, d[0], int(d[1] * 1000), int(d[2] * 1000)) for d in diarization],
+        )
 
         self.con.commit()
