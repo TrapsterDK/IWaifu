@@ -1,6 +1,6 @@
 {% extends "base.jinja" %}
 {% block head %}
-<!--face detection-->
+<!--face detection old-->
 <script src="https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script src="{{ url_for('static', filename='js/facedetection.js') }}"></script>
 
@@ -12,7 +12,15 @@
 {% endblock %}
 {% block content %}
 
-<canvas id=canvas></canvas>
+<!--face detection-->
+<!--<video id="video" muted playsinline style="display: none;" width="1" height="1"></video>-->
+<video id="video" muted playsinline></video>
+<br>
+<p>Emotion: <span id="emo">Vent</span></p>
+<p>Age: <span id="age">Vent</span></p>
+<p>Gender: <span id="gender">Vent</span></p>
+
+<canvas id="canvas"></canvas>
 
 <script>
     //https://github.com/pixijs/pixijs
@@ -23,23 +31,22 @@
         "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json";
 
     (async function main() {
+        PIXI.utils.skipHello();
+        Live2DCubismCore.Logging
+        PIXI.live2d.config.logLevel = PIXI.live2d.config.LOG_LEVEL_NONE;
         const app = new PIXI.Application({
             view: document.getElementById("canvas"),
             autoStart: true,
-            resizeTo: window
+            resizeTo: window,
         });
 
         const model1 = await PIXI.live2d.Live2DModel.from(cubism4Model, { autoInteract: false });
-        //const model2 = await PIXI.live2d.Live2DModel.from(cubism2Model, { autoInteract: false });
 
         app.stage.addChild(model1);
-        //app.stage.addChild(model2);
 
         model1.scale.set(0.2);
-        //model2.scale.set(0.25);
 
-        model1.x = 300;
-        //model2.x = 400;
+        model1.x = 0;
 
         function getModelHeadBounds(model) {
             const areas = model.internalModel.hitAreas
@@ -69,6 +76,7 @@
 
         // mild face following
         window.face_callback = () => {
+            return
             // convert face coordinates to screen coordinates
             // x = window.face_coordinates.x * app.screen.width;
             // y = window.face_coordinates.y * app.screen.height;
@@ -91,22 +99,14 @@
             )
 
             let canvaspos = new PIXI.Point(
-                headcenter.x + movement.x,
-                headcenter.y + movement.y
+                headcenter.x + movement.x * 4,
+                headcenter.y + movement.y * 4
             )
 
-            console.log(canvaspos)
             model1.focus(canvaspos.x, canvaspos.y);
         }
     })();
 </script>
-
-<!--face detection-->
-<!--
-<video id="video" autoplay muted playsinline hidden style="display: none;"></video>
--->
-<video id="video" autoplay muted playsinline></video>
-
 
 
 {% endblock %}

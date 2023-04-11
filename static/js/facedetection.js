@@ -39,29 +39,48 @@ Promise.all([
 
 // start the video
 function startVideo() {
-    navigator.getUserMedia(
-        {
-            video: {},
-        },
-        (stream) => {
+    if (
+        !"mediaDevices" in navigator ||
+        !"getUserMedia" in navigator.mediaDevices
+    ) {
+        console.log("Camera is not supported by your browser");
+        return;
+    }
+    console.log("Camera is supported by your browser");
+
+    navigator.mediaDevices
+        .getUserMedia({
+            video: {
+                width: { ideal: 320 },
+                height: { ideal: 240 },
+            },
+        })
+        .then((stream) => {
+            console.log("video started");
             video.srcObject = stream;
             video.play();
-        },
-        (err) => console.error(err)
-    );
+        })
+        .catch((err) => {
+            console.log("video not started");
+            console.log(err);
+        });
 }
 
 $(document).ready(function () {
     // https://github.com/justadudewhohacks/face-api.js/
     const video = $("#video").get(0);
+    let facedetector = new faceapi.TinyFaceDetectorOptions();
 
-    // when the video starts playing, start the face detection
-    video.addEventListener("play", () => {
+    console.log("video as");
+
+    // when the video metadata is loaded, start the detection
+    video.addEventListener("loadedmetadata", async () => {
+        console.log("video started");
         // update the values every 10ms
         setInterval(async () => {
             // detect the face
             const singleFace = await faceapi
-                .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                .detectSingleFace(video, facedetector)
                 .withFaceLandmarks()
                 .withFaceExpressions()
                 .withAgeAndGender();
@@ -109,23 +128,31 @@ $(document).ready(function () {
                         (singleFace.detection.box.x +
                             singleFace.detection.box.width / 2) /
                             video.videoWidth) *
-                        singleFace.detection.score +
-                    window.face_coordinates.x *
-                        (1 - singleFace.detection.score),
+                        singleFace.score +
+                    window.face_coordinates.x * (1 - singleFace.score),
                 y:
                     (1 -
                         (singleFace.detection.box.y +
                             singleFace.detection.box.height / 2) /
                             video.videoHeight) *
-                        singleFace.detection.score +
-                    window.face_coordinates.y *
-                        (1 - singleFace.detection.score),
+                        singleFace.score +
+                    window.face_coordinates.y * (1 - singleFace.score),
             };
 
             if (window.face_callback !== undefined) {
                 window.face_callback();
             }
-        }, 100);
+
+            /*
+            $("#age").text(Math.round(window.age));
+            $("#gender").text(Math.round(window.gender) ? "Mand" : "Kvinde");
+            $("#emo").text(
+                Object.keys(window.expression).reduce((a, b) =>
+                    window.expression[a] > window.expression[b] ? a : b
+                )
+            );
+            */
+        }, 200);
     });
 
     // start the video
