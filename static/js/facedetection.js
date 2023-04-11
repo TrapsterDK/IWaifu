@@ -50,7 +50,6 @@ function startVideo() {
         console.log("Camera is not supported by your browser");
         return;
     }
-    console.log("Camera is supported by your browser");
 
     navigator.mediaDevices
         .getUserMedia({
@@ -60,7 +59,6 @@ function startVideo() {
             },
         })
         .then((stream) => {
-            console.log("video started");
             video.srcObject = stream;
             video.play();
         })
@@ -74,8 +72,6 @@ $(document).ready(function () {
     // https://github.com/justadudewhohacks/face-api.js/
     const video = $("#video").get(0);
     let facedetector = new faceapi.TinyFaceDetectorOptions();
-
-    console.log("video as");
 
     // when the video metadata is loaded, start the detection
     video.addEventListener("loadedmetadata", async () => {
@@ -150,7 +146,7 @@ $(document).ready(function () {
             if (window.face_callback !== undefined) {
                 window.face_callback();
             }
-        }, 500);
+        }, 1000);
     });
 
     // start the video

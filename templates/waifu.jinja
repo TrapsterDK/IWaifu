@@ -13,8 +13,8 @@
 {% block content %}
 
 <!--face detection-->
-<!--<video id="video" muted playsinline style="display: none;" width="1" height="1"></video>-->
-<video id="video" muted playsinline></video>
+<video id="video" muted playsinline style="display: none;" width="1" height="1"></video>
+<!--<video id="video" muted playsinline></video>-->
 
 <canvas id="canvas"></canvas>
 
@@ -94,8 +94,8 @@
             )
 
             let canvaspos = new PIXI.Point(
-                headcenter.x + movement.x * 4,
-                headcenter.y + movement.y * 4
+                headcenter.x + movement.x,
+                headcenter.y + movement.y
             )
 
             model1.focus(canvaspos.x, canvaspos.y);
