@@ -15,10 +15,6 @@
 <!--face detection-->
 <!--<video id="video" muted playsinline style="display: none;" width="1" height="1"></video>-->
 <video id="video" muted playsinline></video>
-<br>
-<p>Emotion: <span id="emo">Vent</span></p>
-<p>Age: <span id="age">Vent</span></p>
-<p>Gender: <span id="gender">Vent</span></p>
 
 <canvas id="canvas"></canvas>
 
@@ -76,7 +72,6 @@
 
         // mild face following
         window.face_callback = () => {
-            return
             // convert face coordinates to screen coordinates
             // x = window.face_coordinates.x * app.screen.width;
             // y = window.face_coordinates.y * app.screen.height;
