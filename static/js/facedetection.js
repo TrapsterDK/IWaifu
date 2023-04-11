@@ -1,3 +1,4 @@
+/*
 // expression estimate, 0 = not present, 1 = present
 window.expression = {
     angry: 0,
@@ -14,6 +15,7 @@ window.age = 20;
 
 // gender estimate, 0 = male, 1 = female
 window.gender = 0.5;
+*/
 
 // estimated position of the face, 0 to 1s
 window.face_coordinates = {
@@ -26,6 +28,7 @@ Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(
         "https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights"
     ),
+    /*
     faceapi.nets.faceLandmark68Net.loadFromUri(
         "https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights"
     ),
@@ -35,6 +38,7 @@ Promise.all([
     faceapi.nets.ageGenderNet.loadFromUri(
         "https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights"
     ),
+    */
 ]);
 
 // start the video
@@ -79,16 +83,21 @@ $(document).ready(function () {
         // update the values every 10ms
         setInterval(async () => {
             // detect the face
-            const singleFace = await faceapi
-                .detectSingleFace(video, facedetector)
+            const singleFace = await faceapi.detectSingleFace(
+                video,
+                facedetector
+            );
+            /*
                 .withFaceLandmarks()
                 .withFaceExpressions()
                 .withAgeAndGender();
+                */
 
             // if no face is detected, return
             if (singleFace === undefined) return;
 
             // calculate the expression estimate by averaging the current estimate with the new estimate
+            /*
             window.expression = {
                 angry:
                     singleFace.expressions.angry * 0.05 +
@@ -120,20 +129,19 @@ $(document).ready(function () {
 
             // calculate the age estimate by averaging the current estimate with the new estimate
             window.age = singleFace.age * 0.05 + window.age * 0.95;
+            */
 
             // detection point is the center of the box of the face
             window.face_coordinates = {
                 x:
                     (1 -
-                        (singleFace.detection.box.x +
-                            singleFace.detection.box.width / 2) /
+                        (singleFace.box.x + singleFace.box.width / 2) /
                             video.videoWidth) *
                         singleFace.score +
                     window.face_coordinates.x * (1 - singleFace.score),
                 y:
                     (1 -
-                        (singleFace.detection.box.y +
-                            singleFace.detection.box.height / 2) /
+                        (singleFace.box.y + singleFace.box.height / 2) /
                             video.videoHeight) *
                         singleFace.score +
                     window.face_coordinates.y * (1 - singleFace.score),
@@ -142,16 +150,6 @@ $(document).ready(function () {
             if (window.face_callback !== undefined) {
                 window.face_callback();
             }
-
-            /*
-            $("#age").text(Math.round(window.age));
-            $("#gender").text(Math.round(window.gender) ? "Mand" : "Kvinde");
-            $("#emo").text(
-                Object.keys(window.expression).reduce((a, b) =>
-                    window.expression[a] > window.expression[b] ? a : b
-                )
-            );
-            */
         }, 200);
     });
 
