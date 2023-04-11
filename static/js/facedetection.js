@@ -150,7 +150,7 @@ $(document).ready(function () {
             if (window.face_callback !== undefined) {
                 window.face_callback();
             }
-        }, 200);
+        }, 500);
     });
 
     // start the video
