@@ -9,6 +9,36 @@ from flask_login import (
     UserMixin,
 )
 import os
+import openai
+import pathlib
+from dataclasses import dataclass
+import re
+
+MODEL_WAIFU_PATH = pathlib.Path(__file__).parent / "static/models/"
+
+RE_SPLIT_CHAR_INT = re.compile(r"(\d+)")
+waifus_dir = [dir for dir in pathlib.Path(MODEL_WAIFU_PATH).iterdir()]
+waifus_names = [
+    " ".join(
+        re.split(RE_SPLIT_CHAR_INT, str(dir.stem).replace("_", " ").replace("-", " "))
+    ).capitalize()
+    for dir in waifus_dir
+]
+
+waifus_models = [
+    str(next(dir.glob("**/model.json")).relative_to(MODEL_WAIFU_PATH))
+    for dir in waifus_dir
+]
+
+
+@dataclass
+class Model:
+    name: str
+    url: str
+
+
+waifu_models = [Model(name, path) for name, path in zip(waifus_names, waifus_models)]
+
 
 URL_INDEX = "/"
 URL_LOGIN = "/login"
@@ -45,6 +75,9 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
+    # TODO
+    return User(user_id=1, username="test", email="m@gmail.com")
+
     db = get_db()
     user = db.get_user(user_id)
     if user is None:
@@ -55,7 +88,7 @@ def load_user(user_id):
 
 @app.route(URL_INDEX, methods=["GET"])
 def index():
-    return render_template(JINJA_INDEX)
+    return render_template(JINJA_INDEX, models=waifu_models)
 
 
 @app.route(URL_SIGNUP, methods=["GET"])

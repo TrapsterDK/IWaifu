@@ -1,8 +1,10 @@
 {% extends "base.jinja" %}
 {% block head %}
 <!--face detection old-->
+<!--
 <script src="https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script src="{{ url_for('static', filename='js/facedetection.js') }}"></script>
+-->
 
 <!--live2d-->
 <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
@@ -17,90 +19,110 @@
 <!--<video id="video" muted playsinline></video>-->
 
 <canvas id="canvas"></canvas>
+<select id="waifu-selector">
+    {% for model in models %}
+    <option value="{{ model.url }}">{{ model.name }}</option>
+    {% endfor %}
+</select>
+<div id="chat">
+    <h2>Chat</h2>
+</div>
 
 <script>
-    //https://github.com/pixijs/pixijs
-    //https://github.com/guansss/pixi-live2d-display
-    const cubism2Model =
-        "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/shizuku/shizuku.model.json";
-    const cubism4Model =
-        "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json";
+    PIXI.utils.skipHello();
+    Live2DCubismCore.Logging
+    PIXI.live2d.config.logLevel = PIXI.live2d.config.LOG_LEVEL_NONE;
+    const app = new PIXI.Application({
+        view: document.getElementById("canvas"),
+        autoStart: true,
+        width: 500,
+    });
 
-    (async function main() {
-        PIXI.utils.skipHello();
-        Live2DCubismCore.Logging
-        PIXI.live2d.config.logLevel = PIXI.live2d.config.LOG_LEVEL_NONE;
-        const app = new PIXI.Application({
-            view: document.getElementById("canvas"),
-            autoStart: true,
-            resizeTo: window,
+    var model;
+
+    function getModelHeadBounds(model) {
+        const areas = model.internalModel.hitAreas
+
+        // check if head or Head exists
+        head = areas["head"] ?? areas["Head"]
+        if (head == undefined) {
+            console.log("no head found")
+            return
+        }
+
+        // https://github.com/guansss/pixi-live2d-display/blob/7d20ff713c28e3e8f263196b33ccc8f7cf3ad1a0/src/cubism-common/InternalModel.ts#L212
+        const bounds = model.internalModel.getDrawableBounds(head.index);
+
+        return bounds;
+    }
+
+    function transformBounds(bounds, model) {
+        const transform = model.localTransform;
+        bounds.x = bounds.x * transform.a + transform.tx;
+        bounds.y = bounds.y * transform.d + transform.ty;
+        bounds.width = bounds.width * transform.a;
+        bounds.height = bounds.height * transform.d;
+
+        return bounds;
+    }
+
+    // mild face following
+    window.face_callback = () => {
+        // convert face coordinates to screen coordinates
+        // x = window.face_coordinates.x * app.screen.width;
+        // y = window.face_coordinates.y * app.screen.height;
+        let bounds = getModelHeadBounds(model)
+
+        if (bounds == undefined) {
+            return
+        }
+
+        bounds = transformBounds(bounds, model)
+
+        let headcenter = new PIXI.Point(
+            bounds.x + bounds.width / 2,
+            bounds.y + bounds.height / 2
+        )
+
+        let movement = new PIXI.Point(
+            (window.face_coordinates.x * bounds.width - bounds.width / 2),
+            (window.face_coordinates.y * bounds.height - bounds.height / 2),
+        )
+
+        let canvaspos = new PIXI.Point(
+            headcenter.x + movement.x,
+            headcenter.y + movement.y
+        )
+
+        model.focus(canvaspos.x, canvaspos.y);
+    }
+
+    $(document).ready(function () {
+        var mutex = false;
+        var last = null;
+
+        $("#waifu-selector").change(async function () {
+            var selected = $(this).children("option:selected").val();
+
+            last = selected;
+            setTimeout(async function () {
+                if (mutex || last != selected) {
+                    return;
+                }
+
+                mutex = true;
+
+                app.stage.removeChildren();
+                model = await PIXI.live2d.Live2DModel.from("static/models/" + selected, { autoInteract: false });
+                model.scale.set(0.2);
+                app.stage.addChild(model);
+
+                mutex = false;
+            }, 750);
         });
 
-        const model1 = await PIXI.live2d.Live2DModel.from(cubism4Model, { autoInteract: false });
-
-        app.stage.addChild(model1);
-
-        model1.scale.set(0.2);
-
-        model1.x = 0;
-
-        function getModelHeadBounds(model) {
-            const areas = model.internalModel.hitAreas
-
-            // check if head or Head exists
-            head = areas["head"] ?? areas["Head"]
-            if (head == undefined) {
-                console.log("no head found")
-                return
-            }
-
-            // https://github.com/guansss/pixi-live2d-display/blob/7d20ff713c28e3e8f263196b33ccc8f7cf3ad1a0/src/cubism-common/InternalModel.ts#L212
-            const bounds = model.internalModel.getDrawableBounds(head.index);
-
-            return bounds;
-        }
-
-        function transformBounds(bounds, model) {
-            const transform = model.localTransform;
-            bounds.x = bounds.x * transform.a + transform.tx;
-            bounds.y = bounds.y * transform.d + transform.ty;
-            bounds.width = bounds.width * transform.a;
-            bounds.height = bounds.height * transform.d;
-
-            return bounds;
-        }
-
-        // mild face following
-        window.face_callback = () => {
-            // convert face coordinates to screen coordinates
-            // x = window.face_coordinates.x * app.screen.width;
-            // y = window.face_coordinates.y * app.screen.height;
-            let bounds = getModelHeadBounds(model1)
-
-            if (bounds == undefined) {
-                return
-            }
-
-            bounds = transformBounds(bounds, model1)
-
-            let headcenter = new PIXI.Point(
-                bounds.x + bounds.width / 2,
-                bounds.y + bounds.height / 2
-            )
-
-            let movement = new PIXI.Point(
-                (window.face_coordinates.x * bounds.width - bounds.width / 2),
-                (window.face_coordinates.y * bounds.height - bounds.height / 2),
-            )
-
-            let canvaspos = new PIXI.Point(
-                headcenter.x + movement.x,
-                headcenter.y + movement.y
-            )
-
-            model1.focus(canvaspos.x, canvaspos.y);
-        }
-    })();
+        $("#waifu-selector").change();
+    });
 </script>
 
 
