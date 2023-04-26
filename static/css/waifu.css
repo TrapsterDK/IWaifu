@@ -1,0 +1,18 @@
+body {
+    width: 100vw;
+    height: 100vh;
+}
+
+.split {
+    /*flex children (content) to be displayed in a row */
+    display: flex;
+    flex-direction: row;
+}
+
+#canvas {
+    flex: 1;
+}
+
+.content {
+    flex: 1;
+}

@@ -11,31 +11,43 @@
 <script src="https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.2/dist/browser/pixi.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/index.min.js"></script>
+
+<style ref="stylesheet" src="{{ url_for('static', filename='css/waifu.css') }}"></style>
 {% endblock %}
 {% block content %}
 
 <!--face detection-->
 <video id="video" muted playsinline style="display: none;" width="1" height="1"></video>
-<!--<video id="video" muted playsinline></video>-->
 
-<canvas id="canvas"></canvas>
-<select id="waifu-selector">
-    {% for model in models %}
-    <option value="{{ model.url }}">{{ model.name }}</option>
-    {% endfor %}
-</select>
-<div id="chat">
-    <h2>Chat</h2>
+<div class="split">
+    <canvas id="canvas"></canvas>
+
+    <div class="content">
+        <select id="waifu-selector">
+            {% for model in models %}
+            <option value="{{ model.url }}">{{ model.name }}</option>
+            {% endfor %}
+        </select>
+        <div class="chat">
+            <h2>Chat</h2>
+        </div>
+    </div>
 </div>
 
 <script>
+    const WIDTH = 500;
     PIXI.utils.skipHello();
     Live2DCubismCore.Logging
     PIXI.live2d.config.logLevel = PIXI.live2d.config.LOG_LEVEL_NONE;
     const app = new PIXI.Application({
         view: document.getElementById("canvas"),
         autoStart: true,
-        width: 500,
+        width: WIDTH,
+        height: window.innerHeight,
+    });
+
+    $(window).resize(function () {
+        app.renderer.resize(WIDTH, window.innerHeight);
     });
 
     var model;
@@ -114,8 +126,12 @@
 
                 app.stage.removeChildren();
                 model = await PIXI.live2d.Live2DModel.from("static/models/" + selected, { autoInteract: false });
-                model.scale.set(0.2);
+
+                var model_width = model.width;
+                model.scale.set(WIDTH / model_width);
                 app.stage.addChild(model);
+
+                console.log(model.internalModel)
 
                 mutex = false;
             }, 750);
