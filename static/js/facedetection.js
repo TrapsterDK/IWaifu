@@ -68,6 +68,11 @@ function startVideo() {
         });
 }
 
+function StopVideo() {
+    video.pause();
+    video.srcObject = null;
+}
+
 $(document).ready(function () {
     // https://github.com/justadudewhohacks/face-api.js/
     const video = $("#video").get(0);

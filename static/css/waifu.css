@@ -4,15 +4,123 @@ body {
 }
 
 .split {
-    /*flex children (content) to be displayed in a row */
     display: flex;
     flex-direction: row;
 }
 
 #canvas {
-    flex: 1;
+    flex-grow: 0;
+    flex-shrink: 1;
+    flex-basis: auto;
 }
 
 .content {
     flex: 1;
+    align-items: stretch;
+    flex-direction: column;
+    display: flex;
+}
+
+.optionsheader {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5em;
+    background-color: #616a6b;
+    margin: 0px 0px 2px 0px;
+}
+
+.chatheader {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5em;
+    background-color: #616a6b;
+    margin: 0px;
+}
+
+.options {
+    bottom: 0px;
+    width: 100%;
+    margin-bottom: 7px;
+}
+
+.chat-box {
+    width: 100%;
+    margin-bottom: 50px;
+}
+
+.bubble {
+    position: relative;
+    display: inline-block;
+    background-color: #e6e6e6;
+    border-radius: 0.4em;
+    padding: 0.5em;
+    margin: 0.5em;
+    max-width: 80%;
+}
+
+.bubble-left {
+    float: left;
+}
+
+.bubble-right {
+    float: right;
+}
+
+.chatcontainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-end;
+    overflow-y: scroll;
+    height: 100%;
+}
+
+.chat-form {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5em;
+    background-color: #aeaeae;
+    margin: 0px;
+}
+
+.chat-input {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: auto;
+    margin-right: 0.5em;
+    border: 0px;
+    height: 2em;
+    border-radius: 0.4em;
+}
+
+.chat-button {
+    flex-grow: 0;
+    flex-shrink: 1;
+    flex-basis: auto;
+    border: 0px;
+    height: 2em;
+    border-radius: 0.4em;
+}
+
+.chat-button:hover {
+    background-color: #616a6b;
+}
+
+.chat-button:active {
+    background-color: #808080;
+}
+
+.chat {
+    height: 100%;
+}
+
+table.optionss {
+    width: 100%;
+    border-collapse: collapse;
 }

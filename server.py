@@ -26,7 +26,7 @@ waifus_names = [
 ]
 
 waifus_models = [
-    str(next(dir.glob("**/model.json")).relative_to(MODEL_WAIFU_PATH))
+    str(next(dir.glob("**/model.json")).relative_to(pathlib.Path(__file__).parent))
     for dir in waifus_dir
 ]
 
@@ -172,4 +172,4 @@ def logout():
 if __name__ == "__main__":
     print("Starting server...")
     app.run("localhost", debug=True)
-    #app.run("0.0.0.0", debug=True)
+    # app.run("0.0.0.0", debug=True)

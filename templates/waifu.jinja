@@ -12,7 +12,10 @@
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.2/dist/browser/pixi.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/index.min.js"></script>
 
-<style ref="stylesheet" src="{{ url_for('static', filename='css/waifu.css') }}"></style>
+
+<script src="{{ url_for('static', filename='js/model.js') }}"></script>
+
+<link href="{{ url_for('static', filename='css/waifu.css') }}" rel="stylesheet" />
 {% endblock %}
 {% block content %}
 
@@ -23,123 +26,58 @@
     <canvas id="canvas"></canvas>
 
     <div class="content">
-        <select id="waifu-selector">
-            {% for model in models %}
-            <option value="{{ model.url }}">{{ model.name }}</option>
-            {% endfor %}
-        </select>
         <div class="chat">
-            <h2>Chat</h2>
+            <h2 class="chatheader">Chat</h2>
+            <div class="chatcontainer">
+                <div class="chat-box">
+                    <div class="bubble bubble-right">
+                        <div class="bubble-content">
+                            <p>Hi! I'm {{ models[0].name }}. I'm a virtual assistant.</p>
+                        </div>
+                        <div class="bubble-tail"></div>
+                        <div class="chat-timestamp">12:00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <form class="chat-form" action="javascript:void(0);">
+            <input type="text" class="chat-input" placeholder="Type a message..." />
+            <button class="chat-button" type="submit">Send</button>
+        </form>
+
+        <div class="options">
+            <h2 class="optionsheader">Options</h2>
+            <table class="optionss">
+                <tr>
+                    <th>Model</th>
+                    <th>
+                        <select id="waifu-selector" class="option-selector">
+                            {% for model in models %}
+                            <option value="{{ model.url }}">{{ model.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </th>
+                </tr>
+                <tr>
+                    <th>Face following</th>
+                    <th>
+                        <label class="switch">
+                            <input type="checkbox" id="face-following">
+                            <span class="slider round"></span>
+                        </label>
+                    </th>
+                </tr>
+                <tr>
+                    <th>Speech</th>
+                    <th>
+                        <label class="switch">
+                            <input type="checkbox" id="speech" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </th>
+                </tr>
+            </table>
         </div>
     </div>
 </div>
-
-<script>
-    const WIDTH = 500;
-    PIXI.utils.skipHello();
-    Live2DCubismCore.Logging
-    PIXI.live2d.config.logLevel = PIXI.live2d.config.LOG_LEVEL_NONE;
-    const app = new PIXI.Application({
-        view: document.getElementById("canvas"),
-        autoStart: true,
-        width: WIDTH,
-        height: window.innerHeight,
-    });
-
-    $(window).resize(function () {
-        app.renderer.resize(WIDTH, window.innerHeight);
-    });
-
-    var model;
-
-    function getModelHeadBounds(model) {
-        const areas = model.internalModel.hitAreas
-
-        // check if head or Head exists
-        head = areas["head"] ?? areas["Head"]
-        if (head == undefined) {
-            console.log("no head found")
-            return
-        }
-
-        // https://github.com/guansss/pixi-live2d-display/blob/7d20ff713c28e3e8f263196b33ccc8f7cf3ad1a0/src/cubism-common/InternalModel.ts#L212
-        const bounds = model.internalModel.getDrawableBounds(head.index);
-
-        return bounds;
-    }
-
-    function transformBounds(bounds, model) {
-        const transform = model.localTransform;
-        bounds.x = bounds.x * transform.a + transform.tx;
-        bounds.y = bounds.y * transform.d + transform.ty;
-        bounds.width = bounds.width * transform.a;
-        bounds.height = bounds.height * transform.d;
-
-        return bounds;
-    }
-
-    // mild face following
-    window.face_callback = () => {
-        // convert face coordinates to screen coordinates
-        // x = window.face_coordinates.x * app.screen.width;
-        // y = window.face_coordinates.y * app.screen.height;
-        let bounds = getModelHeadBounds(model)
-
-        if (bounds == undefined) {
-            return
-        }
-
-        bounds = transformBounds(bounds, model)
-
-        let headcenter = new PIXI.Point(
-            bounds.x + bounds.width / 2,
-            bounds.y + bounds.height / 2
-        )
-
-        let movement = new PIXI.Point(
-            (window.face_coordinates.x * bounds.width - bounds.width / 2),
-            (window.face_coordinates.y * bounds.height - bounds.height / 2),
-        )
-
-        let canvaspos = new PIXI.Point(
-            headcenter.x + movement.x,
-            headcenter.y + movement.y
-        )
-
-        model.focus(canvaspos.x, canvaspos.y);
-    }
-
-    $(document).ready(function () {
-        var mutex = false;
-        var last = null;
-
-        $("#waifu-selector").change(async function () {
-            var selected = $(this).children("option:selected").val();
-
-            last = selected;
-            setTimeout(async function () {
-                if (mutex || last != selected) {
-                    return;
-                }
-
-                mutex = true;
-
-                app.stage.removeChildren();
-                model = await PIXI.live2d.Live2DModel.from("static/models/" + selected, { autoInteract: false });
-
-                var model_width = model.width;
-                model.scale.set(WIDTH / model_width);
-                app.stage.addChild(model);
-
-                console.log(model.internalModel)
-
-                mutex = false;
-            }, 750);
-        });
-
-        $("#waifu-selector").change();
-    });
-</script>
-
-
 {% endblock %}
