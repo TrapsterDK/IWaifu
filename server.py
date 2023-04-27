@@ -44,6 +44,7 @@ URL_INDEX = "/"
 URL_LOGIN = "/login"
 URL_LOGOUT = "/logout"
 URL_SIGNUP = "/signup"
+URL_CHAT = "/chat"
 
 JINJA_INDEX = "waifu.jinja"
 JINJA_LOGIN = "login.jinja"
@@ -169,7 +170,11 @@ def logout():
     return redirect(URL_INDEX)
 
 
+@app.route(URL_CHAT, methods=["POST"])
+def chat():
+    return {"message": "hey", "time": "22:01"}
+
+
 if __name__ == "__main__":
     print("Starting server...")
     app.run("localhost", debug=True)
-    # app.run("0.0.0.0", debug=True)

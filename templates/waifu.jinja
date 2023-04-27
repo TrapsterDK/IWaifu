@@ -14,6 +14,7 @@
 
 
 <script src="{{ url_for('static', filename='js/model.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 
 <link href="{{ url_for('static', filename='css/waifu.css') }}" rel="stylesheet" />
 {% endblock %}
@@ -26,58 +27,52 @@
     <canvas id="canvas"></canvas>
 
     <div class="content">
-        <div class="chat">
-            <h2 class="chatheader">Chat</h2>
-            <div class="chatcontainer">
-                <div class="chat-box">
-                    <div class="bubble bubble-right">
-                        <div class="bubble-content">
-                            <p>Hi! I'm {{ models[0].name }}. I'm a virtual assistant.</p>
-                        </div>
-                        <div class="bubble-tail"></div>
-                        <div class="chat-timestamp">12:00</div>
-                    </div>
+        <h2 class="chatheader">Chat</h2>
+
+        <div id="chat">
+            <div class="bubblewrap">
+                <div class="bubble bubble-recieve">
+                    <p>Hi! I'm {{ models[0].name }}. I'm a virtual assistant.</p>
                 </div>
+                <div class="chat-timestamp recieve">12:00</div>
             </div>
         </div>
-        <form class="chat-form" action="javascript:void(0);">
-            <input type="text" class="chat-input" placeholder="Type a message..." />
-            <button class="chat-button" type="submit">Send</button>
+        <form id="chat-form" action="javascript:void(0);">
+            <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
+            <button id="chat-button" type="submit">Send</button>
         </form>
+        <h2 class="optionsheader">Options</h2>
 
-        <div class="options">
-            <h2 class="optionsheader">Options</h2>
-            <table class="optionss">
-                <tr>
-                    <th>Model</th>
-                    <th>
-                        <select id="waifu-selector" class="option-selector">
-                            {% for model in models %}
-                            <option value="{{ model.url }}">{{ model.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </th>
-                </tr>
-                <tr>
-                    <th>Face following</th>
-                    <th>
-                        <label class="switch">
-                            <input type="checkbox" id="face-following">
-                            <span class="slider round"></span>
-                        </label>
-                    </th>
-                </tr>
-                <tr>
-                    <th>Speech</th>
-                    <th>
-                        <label class="switch">
-                            <input type="checkbox" id="speech" checked>
-                            <span class="slider round"></span>
-                        </label>
-                    </th>
-                </tr>
-            </table>
-        </div>
+        <table class="options">
+            <tr>
+                <th>Model</th>
+                <th>
+                    <select id="waifu-selector" class="option-selector">
+                        {% for model in models %}
+                        <option value="{{ model.url }}">{{ model.name }}</option>
+                        {% endfor %}
+                    </select>
+                </th>
+            </tr>
+            <tr>
+                <th>Face following</th>
+                <th>
+                    <label class="switch">
+                        <input type="checkbox" id="face-following">
+                        <span class="slider round"></span>
+                    </label>
+                </th>
+            </tr>
+            <tr>
+                <th>Speech</th>
+                <th>
+                    <label class="switch">
+                        <input type="checkbox" id="speech" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </th>
+            </tr>
+        </table>
     </div>
 </div>
 {% endblock %}

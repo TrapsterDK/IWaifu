@@ -19,6 +19,7 @@ body {
     align-items: stretch;
     flex-direction: column;
     display: flex;
+    max-height: 100vh;
 }
 
 .optionsheader {
@@ -41,55 +42,77 @@ body {
     margin: 0px;
 }
 
-.options {
-    bottom: 0px;
-    width: 100%;
-    margin-bottom: 7px;
-}
-
-.chat-box {
-    width: 100%;
-    margin-bottom: 50px;
-}
-
 .bubble {
-    position: relative;
     display: inline-block;
     background-color: #e6e6e6;
     border-radius: 0.4em;
-    padding: 0.5em;
+    padding: 0 1em;
     margin: 0.5em;
+    margin-bottom: 1.2em;
+    word-wrap: break-word;
+    word-break: break-all;
     max-width: 80%;
 }
 
-.bubble-left {
+.chat-timestamp {
+    font-size: 0.8em;
+    color: #616a6b;
+    margin: 0px 0.5em;
+    position: absolute;
+    bottom: 0px;
+}
+
+.recieve {
+    left: 5px;
+}
+
+.send {
+    right: 5px;
+}
+
+.bubblewrap {
+    display: inline-block;
+    width: 100%;
+    position: relative;
+}
+
+.bubble-recieve {
     float: left;
+    background-color: #2196f3;
+    border-bottom-left-radius: 0em;
 }
 
-.bubble-right {
+.bubble-send {
     float: right;
+    background-color: #4caf50;
+    border-bottom-right-radius: 0em;
 }
 
-.chatcontainer {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    align-items: flex-end;
+#chat {
     overflow-y: scroll;
+    display: flex;
+    flex-flow: column nowrap;
     height: 100%;
+    margin: 0px;
+    border: 0px;
 }
 
-.chat-form {
+#chat > :first-child {
+    margin-top: auto !important;
+}
+
+#chat-form {
+    position: relative;
     display: flex;
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5em;
+    padding: 0.5em 0.3em;
     background-color: #aeaeae;
     margin: 0px;
 }
 
-.chat-input {
+#chat-input {
     flex-grow: 1;
     flex-shrink: 1;
     flex-basis: auto;
@@ -99,7 +122,7 @@ body {
     border-radius: 0.4em;
 }
 
-.chat-button {
+#chat-button {
     flex-grow: 0;
     flex-shrink: 1;
     flex-basis: auto;
@@ -108,19 +131,17 @@ body {
     border-radius: 0.4em;
 }
 
-.chat-button:hover {
+#chat-button:hover {
     background-color: #616a6b;
 }
 
-.chat-button:active {
+#chat-button:active {
     background-color: #808080;
 }
 
-.chat {
-    height: 100%;
-}
-
-table.optionss {
+table.options {
     width: 100%;
     border-collapse: collapse;
+    bottom: 0px;
+    margin-bottom: 7px;
 }
