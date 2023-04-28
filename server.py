@@ -13,8 +13,16 @@ import openai
 import pathlib
 from dataclasses import dataclass
 import re
+import pyttsx3
+
+engine = pyttsx3.init()
+voice = engine.getProperty("voices")
+engine.setProperty("voice", voice[1].id)
+
+openai.api_key = "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"
 
 MODEL_WAIFU_PATH = pathlib.Path(__file__).parent / "static/models/"
+AUDIOS_PATH = pathlib.Path(__file__).parent / "static/assets/audios/"
 
 RE_SPLIT_CHAR_INT = re.compile(r"(\d+)")
 waifus_dir = [dir for dir in pathlib.Path(MODEL_WAIFU_PATH).iterdir()]
@@ -172,7 +180,45 @@ def logout():
 
 @app.route(URL_CHAT, methods=["POST"])
 def chat():
-    return {"message": "hey", "time": "22:01"}
+    # get message from request
+    if "message" not in request.form:
+        return "Missing message"
+
+    message = request.form["message"]
+    
+    if message.strip() == "":
+        return "Empty message"
+
+    completion = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=f"""
+You story is that you are a cute waifu, you full of emotions and love, answer the following human
+
+Human: 
+{message}
+
+Waifu:
+""",
+        temperature=0.7,
+        top_p=1,
+        frequency_penalty=0.5,
+        presence_penalty=0.5,
+        max_tokens=500,
+    )
+
+    text = completion.choices[0].text
+
+    # TODO
+    AUDIOS_PATH.joinpath("user").mkdir(parents=True, exist_ok=True)
+    file = AUDIOS_PATH.joinpath("user", hex(hash(text)) + ".mp3")
+    engine.save_to_file(text, str(file)[2:])
+    engine.runAndWait()
+
+    return {
+        "message": completion.choices[0].text,
+        "time": "22:01",
+        "audio": str(file.relative_to(pathlib.Path(__file__).parent)),
+    }
 
 
 if __name__ == "__main__":

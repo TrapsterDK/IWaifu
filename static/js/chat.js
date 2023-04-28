@@ -14,6 +14,11 @@ function getBubbleTemplate(message, timestamp, type) {
 $(document).ready(function () {
     $("#chat-form").on("submit", function (event) {
         let chat_input = $("#chat-input");
+
+        if (!chat_input.val().trim()) {
+            return false;
+        }
+
         let chat = $("#chat");
         let time = new Date().toLocaleTimeString(
             {},
@@ -22,8 +27,6 @@ $(document).ready(function () {
 
         chat.append(getBubbleTemplate(chat_input.val(), time, "send"));
         chat.scrollTop(chat.prop("scrollHeight"));
-
-        chat_input.val("");
 
         $.ajax({
             url: "/chat",
@@ -34,7 +37,12 @@ $(document).ready(function () {
                     getBubbleTemplate(json.message, json.time, "recieve")
                 );
                 chat.scrollTop(chat.prop("scrollHeight"));
+
+                var audio = new Audio(json.audio);
+                audio.play();
             },
         });
+
+        chat_input.val("");
     });
 });

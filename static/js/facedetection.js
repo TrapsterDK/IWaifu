@@ -147,10 +147,6 @@ $(document).ready(function () {
                         singleFace.score +
                     window.face_coordinates.y * (1 - singleFace.score),
             };
-
-            if (window.face_callback !== undefined) {
-                window.face_callback();
-            }
         }, 1000);
     });
 

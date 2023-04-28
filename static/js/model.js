@@ -43,7 +43,7 @@ window.onload = function () {
     });
 
     // mild face following
-    window.face_callback = () => {
+    window.face_coordinates = () => {
         let bounds = getModelHeadBounds(model);
 
         if (bounds == undefined) {
@@ -100,8 +100,22 @@ window.onload = function () {
             if (last != selected) {
                 $("#waifu-selector").change();
             }
+
+            if (getModelHeadBounds(model) == undefined) {
+                $("#face-following").prop("disabled", true);
+                $("#face-following").prop("checked", false);
+            } else {
+                $("#face-following").prop("disabled", false);
+            }
         }, 750);
     });
+    $("#face-following").change(function () {
+        if ($(this).is(":checked")) {
+            window.face_callback();
+            model.on("update", window.face_callback);
+        } else {
+            model.off("update", window.face_callback);
+        }
 
     $("#waifu-selector").change();
 };
