@@ -6,6 +6,7 @@ body {
 .split {
     display: flex;
     flex-direction: row;
+    position: relative;
 }
 
 #canvas {
@@ -16,10 +17,10 @@ body {
 
 .content {
     flex: 1;
-    align-items: stretch;
     flex-direction: column;
     display: flex;
     max-height: 100vh;
+    max-width: calc(100% - 500px);
 }
 
 .optionsheader {
@@ -49,9 +50,10 @@ body {
     padding: 0 1em;
     margin: 0.5em;
     margin-bottom: 1.2em;
-    word-wrap: break-word;
-    word-break: break-all;
     max-width: 80%;
+
+    /*break*/
+    overflow-wrap: break-word;
 }
 
 .chat-timestamp {
@@ -72,8 +74,8 @@ body {
 
 .bubblewrap {
     display: inline-block;
-    width: 100%;
     position: relative;
+    width: 100%;
 }
 
 .bubble-recieve {

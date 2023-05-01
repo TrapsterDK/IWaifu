@@ -1,12 +1,10 @@
 import sqlite3
-from flask import current_app, g
-from utils import hash_password, generate_salt
 
 
-class SQLite:
+class Database:
     def __init__(self, db_file):
         self.db_file = db_file
-        self.db = sqlite3.connect(current_app.config["DATABASE"])
+        self.db = sqlite3.connect(db_file)
         self.db.row_factory = sqlite3.Row
         self.conn = self.db.cursor()
 
@@ -108,17 +106,3 @@ class SQLite:
             return None
 
         return user
-
-
-def get_db() -> SQLite:
-    if "db" not in g:
-        g.db = SQLite(current_app.config["DATABASE"])
-
-    return g.db
-
-
-def close_db(e=None) -> None:
-    db = g.pop("db", None)
-
-    if db is not None:
-        db.close()

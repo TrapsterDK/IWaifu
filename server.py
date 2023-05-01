@@ -14,6 +14,7 @@ import pathlib
 from dataclasses import dataclass
 import re
 import pyttsx3
+from sqlite import Database
 
 engine = pyttsx3.init()
 voice = engine.getProperty("voices")
@@ -64,6 +65,8 @@ app = Flask(__name__)
 app.config["DEBUG"] = True
 app.config["DATABASE"] = "database.db"
 app.secret_key = os.urandom(24)
+
+db = Database(app.config["DATABASE"])
 
 
 @app.teardown_appcontext
@@ -180,12 +183,17 @@ def logout():
 
 @app.route(URL_CHAT, methods=["POST"])
 def chat():
+    return {
+        "message": "jlnkdsæjhgagarjdfzdfzlzflkzdfgænfbfnjnlfbfbljnlddfgænfbfnjnlfbfbljnlddfgænfbfnjnlfbfbljnld",
+        "time": "22:01",
+        "audio": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    }
     # get message from request
     if "message" not in request.form:
         return "Missing message"
 
     message = request.form["message"]
-    
+
     if message.strip() == "":
         return "Empty message"
 
@@ -210,8 +218,8 @@ Waifu:
 
     # TODO
     AUDIOS_PATH.joinpath("user").mkdir(parents=True, exist_ok=True)
-    file = AUDIOS_PATH.joinpath("user", hex(hash(text)) + ".mp3")
-    engine.save_to_file(text, str(file)[2:])
+    file = AUDIOS_PATH.joinpath("user", str(hex(abs(hash(text))))[2:] + ".mp3")
+    engine.save_to_file(text, str(file))
     engine.runAndWait()
 
     return {

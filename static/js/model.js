@@ -116,6 +116,7 @@ window.onload = function () {
         } else {
             model.off("update", window.face_callback);
         }
+    });
 
     $("#waifu-selector").change();
 };
