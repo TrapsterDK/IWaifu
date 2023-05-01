@@ -31,7 +31,10 @@ $(document).ready(function () {
         $.ajax({
             url: "/chat",
             type: "POST",
-            data: { message: chat_input.val() },
+            data: {
+                message: chat_input.val(),
+                waifu: $("#waifu-selector option:selected").text(),
+            },
             success: function (json) {
                 chat.append(
                     getBubbleTemplate(json.message, json.time, "recieve")

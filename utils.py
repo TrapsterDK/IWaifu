@@ -1,4 +1,3 @@
-import hashlib
 import os
 import pathlib
 import json
@@ -29,14 +28,6 @@ MINUTES_SAVE_LOG = 2
 MINUTE = 60
 
 
-def generate_salt() -> bytes:
-    return os.urandom(32)
-
-
-def hash_password(plaintext: str, salt: str) -> str:
-    return hashlib.pbkdf2_hmac("sha256", plaintext.encode("utf-8"), salt, 100000)
-
-
 def mp4_to_mp3(mp4_file: pathlib.Path, mp3_file: pathlib.Path):
     if mp3_file.exists():
         return
@@ -48,13 +39,13 @@ def mp4_to_mp3(mp4_file: pathlib.Path, mp3_file: pathlib.Path):
     stream = ffmpeg.output(stream, mp3_file, acodec="libmp3lame", ac=1, ar="48k")
     ffmpeg.run(stream, overwrite_output=True, quiet=True)
 
+
 def mp3_to_mp3_mono(mp3_file: pathlib.Path, mp3_file_mono: pathlib.Path):
     if mp3_file_mono.exists():
         return
 
     mp3_file = str(mp3_file)
     mp3_file_mono = str(mp3_file_mono)
-
 
     # change the audio to mono and frequency to 22050
     stream = ffmpeg.input(mp3_file)

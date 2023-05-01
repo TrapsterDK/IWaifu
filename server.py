@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect
-from sqlite import get_db, close_db
+from sqlite import Database
 from flask_login import (
     LoginManager,
     current_user,
@@ -15,6 +15,42 @@ from dataclasses import dataclass
 import re
 import pyttsx3
 from sqlite import Database
+from datetime import datetime
+import spacy
+import random
+
+# pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_lg-0.5.1.tar.gz
+# nlp = spacy.load("en_core_sci_lg")
+
+# https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_sm-0.5.1.tar.gz
+nlp = spacy.load("en_core_sci_sm")
+
+
+# Fake nlp
+class FakeDoc:
+    def __init__(self, text):
+        self.text = text
+        self.ents = []
+
+    def __call__(self, text):
+        return FakeDoc(text)
+
+    def __iter__(self):
+        return iter(self.ents)
+
+    def __len__(self):
+        return len(self.ents)
+
+
+class FakeNLP:
+    def __init__(self):
+        pass
+
+    def __call__(self, text):
+        return FakeDoc(text)
+
+
+# nlp = FakeNLP()
 
 engine = pyttsx3.init()
 voice = engine.getProperty("voices")
@@ -69,11 +105,6 @@ app.secret_key = os.urandom(24)
 db = Database(app.config["DATABASE"])
 
 
-@app.teardown_appcontext
-def teardown(execption):
-    close_db()
-
-
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -90,7 +121,6 @@ def load_user(user_id):
     # TODO
     return User(user_id=1, username="test", email="m@gmail.com")
 
-    db = get_db()
     user = db.get_user(user_id)
     if user is None:
         return None
@@ -99,6 +129,7 @@ def load_user(user_id):
 
 
 @app.route(URL_INDEX, methods=["GET"])
+@login_required
 def index():
     return render_template(JINJA_INDEX, models=waifu_models)
 
@@ -131,7 +162,6 @@ def signup_post():
     ):
         return "Password does not meet requirements"
 
-    db = get_db()
     new_user_id = db.add_user(username, password, email)
     if new_user_id == None:
         return "Username or email already exists"
@@ -143,6 +173,8 @@ def signup_post():
 
 @app.route(URL_LOGIN, methods=["GET"])
 def login_get():
+    login_user(User(user_id=1, username="test", email="m@gmail.com"), remember=True)
+
     if current_user.is_authenticated:
         return redirect(URL_INDEX)
 
@@ -158,8 +190,7 @@ def login_post():
     password = request.form["password"]
     remember = "remember" in request.form and request.form["remember"] == True
 
-    db = get_db()
-    user = db.get_username_user(email)
+    user = db.get_user_from_email(email)
     if user == None:
         return "Incorrect email or password"
 
@@ -181,26 +212,59 @@ def logout():
     return redirect(URL_INDEX)
 
 
+def generate_memory(user_id: int, waifu: str) -> str:
+    messages = db.get_messages(user_id, waifu, 50)
+
+    human_memory = []
+    waifu_memory = []
+    for message in messages:
+        text = message["message"]
+        doc = nlp(text)
+
+        if message["from_user"] == True:
+            human_memory.extend(doc.ents)
+        else:
+            waifu_memory.extend(doc.ents)
+
+    return (human_memory, waifu_memory)
+
+
 @app.route(URL_CHAT, methods=["POST"])
+@login_required
 def chat():
-    return {
-        "message": "jlnkdsæjhgagarjdfzdfzlzflkzdfgænfbfnjnlfbfbljnlddfgænfbfnjnlfbfbljnlddfgænfbfnjnlfbfbljnld",
-        "time": "22:01",
-        "audio": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    }
     # get message from request
     if "message" not in request.form:
         return "Missing message"
 
-    message = request.form["message"]
+    if "waifu" not in request.form:
+        return "Missing waifu"
 
-    if message.strip() == "":
+    message = request.form["message"].strip()
+
+    if message == "":
         return "Empty message"
 
+    waifu = request.form["waifu"]
+
+    if waifu not in waifus_names:
+        return "Invalid waifu"
+
+    db.add_message(current_user.id, waifu, message, True, datetime.now())
+
+    human_memory, waifu_memory = generate_memory(current_user.id, waifu)
+    print(human_memory, waifu_memory)
+
     completion = openai.Completion.create(
-        engine="text-davinci-003",
+        engine="text-davinci-003",  # "text-davinci-003", "text-ada-001"
         prompt=f"""
-You story is that you are a cute waifu, you full of emotions and love, answer the following human
+You are a cute waifu, you full of emotions and love. Your name is {waifu}.
+Be somewhat breif like a human dialogue, and display emotions.  
+
+Human chat memory:
+{','.join([str(x) for x in human_memory])}
+
+Waifu chat memory:
+{','.join([str(x) for x in waifu_memory])}
 
 Human: 
 {message}
@@ -216,7 +280,10 @@ Waifu:
 
     text = completion.choices[0].text
 
-    # TODO
+    waifu_time = datetime.now()
+    db.add_message(current_user.id, waifu, text, False, waifu_time.timestamp())
+
+    # TODO deletion
     AUDIOS_PATH.joinpath("user").mkdir(parents=True, exist_ok=True)
     file = AUDIOS_PATH.joinpath("user", str(hex(abs(hash(text))))[2:] + ".mp3")
     engine.save_to_file(text, str(file))
@@ -224,7 +291,7 @@ Waifu:
 
     return {
         "message": completion.choices[0].text,
-        "time": "22:01",
+        "time": waifu_time.strftime("%H:%M"),
         "audio": str(file.relative_to(pathlib.Path(__file__).parent)),
     }
 
@@ -232,3 +299,4 @@ Waifu:
 if __name__ == "__main__":
     print("Starting server...")
     app.run("localhost", debug=True)
+    # app.run("0.0.0.0", debug=True)
