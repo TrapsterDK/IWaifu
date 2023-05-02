@@ -21,7 +21,7 @@ import spacy
 # pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_lg-0.5.1.tar.gz
 # nlp = spacy.load("en_core_sci_lg")
 
-# https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_sm-0.5.1.tar.gz
+# python -m spacy download en_core_web_sm
 nlp = spacy.load("en_core_web_sm")
 
 """
