@@ -47,7 +47,6 @@ window.start_facedetection = function () {
         !"mediaDevices" in navigator ||
         !"getUserMedia" in navigator.mediaDevices
     ) {
-        console.log("Camera is not supported by your browser");
         return;
     }
 
@@ -61,10 +60,6 @@ window.start_facedetection = function () {
         .then((stream) => {
             video.srcObject = stream;
             video.play();
-        })
-        .catch((err) => {
-            console.log("video not started");
-            console.log(err);
         });
 };
 
@@ -80,7 +75,6 @@ $(document).ready(function () {
 
     // when the video metadata is loaded, start the detection
     video.addEventListener("loadedmetadata", async () => {
-        console.log("video started");
         // update the values every 10ms
         let faceinterval = setInterval(async () => {
             if (video.paused || video.ended) clearInterval(faceinterval);

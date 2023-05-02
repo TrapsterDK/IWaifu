@@ -9,7 +9,6 @@ function login_signup_form_handler(form, url) {
             if (data === "success") {
                 $(location).prop("href", "/");
             } else {
-                console.log(data);
                 $("#server-error").html(data);
                 $("#server-error").show();
             }

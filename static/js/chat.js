@@ -73,7 +73,7 @@ $(document).ready(function () {
                 chat.scrollTop(chat.prop("scrollHeight"));
 
                 if (speech) {
-                    var audio = new Audio(json.audio);
+                    var audio = new Audio("/animevoiceresponce");
                     audio.play();
                 }
             },

@@ -103,8 +103,6 @@ window.onload = function () {
             window.face_coordinates.y * bounds.height - bounds.height / 2
         );
 
-        console.log(headcenter, movement);
-
         let canvaspos = new PIXI.Point(
             headcenter.x + movement.x,
             headcenter.y + movement.y

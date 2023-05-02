@@ -61,8 +61,8 @@ openai.api_key = "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"
 PARENT_PATH = pathlib.Path(__file__).parent
 
 MODEL_WAIFU_PATH = PARENT_PATH / "static/models/"
-AUDIO_STR_PATH = "static/assets/audios/"
-AUDIOS_PATH = PARENT_PATH / AUDIO_STR_PATH
+AUDIOS_PATH = PARENT_PATH / "audios/"
+AUDIOS_PATH.mkdir(exist_ok=True)
 
 RE_SPLIT_CHAR_INT = re.compile(r"(\d+)")
 waifus_dir = [dir for dir in pathlib.Path(MODEL_WAIFU_PATH).iterdir()]
@@ -226,7 +226,7 @@ def generate_memory(user_id: int, waifu: str) -> str:
         else:
             waifu_memory.extend(doc.ents)
 
-    return (human_memory, waifu_memory)
+    return (human_memory[50:], waifu_memory[30:])
 
 
 @app.route(URL_CHAT, methods=["POST"])
@@ -264,12 +264,10 @@ def chat():
     )
 
     human_memory, waifu_memory = generate_memory(current_user.id, waifu)
-    print(human_memory, waifu_memory)
 
     completion = openai.Completion.create(
         engine="text-davinci-003",  # "text-davinci-003", "text-ada-001"
-        prompt=f"""
-You are a cute waifu, you full of emotions and love. Your name is {waifu}.
+        prompt=f"""You are a cute waifu, you full of emotions and love. Your name is {waifu}.
 Be somewhat breif like a human dialogue, and display emotions.  
 
 Human chat memory:
@@ -298,35 +296,25 @@ Waifu:
     if "speech" not in request.form:
         return "missing speech"
 
-    returnobj = {
-        "message": completion.choices[0].text,
-        "time": waifu_time.strftime("%H:%M"),
-    }
-
     if request.form["speech"] == "true":
-        # TODO deletion
-        userpath = AUDIOS_PATH.joinpath(str(current_user.id))
-        userpath.mkdir(parents=True, exist_ok=True)
-
-        file_name = str(hex(abs(hash(text))))[2:] + ".mp3"
-        file = userpath.joinpath(file_name)
+        file = AUDIOS_PATH.joinpath(str(current_user.id) + ".mp3")
 
         engine.save_to_file(text, str(file))
         engine.runAndWait()
 
-        user_file_path = AUDIOS_PATH.joinpath(file_name)
-        returnobj["audio"] = str(user_file_path.relative_to(PARENT_PATH))
-
-    return returnobj
+    return {
+        "message": completion.choices[0].text,
+        "time": waifu_time.strftime("%H:%M"),
+    }
 
 
 @app.route(
-    "/" + AUDIO_STR_PATH + "<path:audio>",
+    "/animevoiceresponce",
     methods=["GET"],
 )
 @login_required
-def url_audio(audio):
-    return send_from_directory(AUDIOS_PATH.joinpath(str(current_user.id)), audio)
+def url_audio():
+    return send_from_directory(AUDIOS_PATH, str(current_user.id) + ".mp3")
 
 
 if __name__ == "__main__":

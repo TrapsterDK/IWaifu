@@ -169,4 +169,4 @@ Scripts/
 database.db
 database.db-shm
 database.db-wal
-/static/assets/audios/user
+static/assets/audios/**
