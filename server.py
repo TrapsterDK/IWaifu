@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, send_from_directory
 from sqlite import Database
 from flask_login import (
     LoginManager,
@@ -17,8 +17,6 @@ import pyttsx3
 from sqlite import Database
 from datetime import datetime
 import spacy
-import random
-import json
 
 # pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_lg-0.5.1.tar.gz
 # nlp = spacy.load("en_core_sci_lg")
@@ -26,7 +24,7 @@ import json
 # https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_sm-0.5.1.tar.gz
 nlp = spacy.load("en_core_web_sm")
 
-
+"""
 # Fake nlp
 class FakeDoc:
     def __init__(self, text):
@@ -51,8 +49,8 @@ class FakeNLP:
         return FakeDoc(text)
 
 
-# nlp = FakeNLP()
-
+nlp = FakeNLP()
+"""
 
 engine = pyttsx3.init()
 voice = engine.getProperty("voices")
@@ -63,7 +61,8 @@ openai.api_key = "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"
 PARENT_PATH = pathlib.Path(__file__).parent
 
 MODEL_WAIFU_PATH = PARENT_PATH / "static/models/"
-AUDIOS_PATH = PARENT_PATH / "static/assets/audios/"
+AUDIO_STR_PATH = "static/assets/audios/"
+AUDIOS_PATH = PARENT_PATH / AUDIO_STR_PATH
 
 RE_SPLIT_CHAR_INT = re.compile(r"(\d+)")
 waifus_dir = [dir for dir in pathlib.Path(MODEL_WAIFU_PATH).iterdir()]
@@ -94,7 +93,8 @@ URL_LOGOUT = "/logout"
 URL_SIGNUP = "/signup"
 URL_CHAT = "/chat"
 
-JINJA_INDEX = "waifu.jinja"
+JINJA_INDEX = "index.jinja"
+JINJA_INDEX_LOGGED_IN = "waifu.jinja"
 JINJA_LOGIN = "login.jinja"
 JINJA_SIGNUP = "signup.jinja"
 
@@ -121,9 +121,6 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    # TODO
-    return User(user_id=1, username="test", email="m@gmail.com")
-
     user = db.get_user(user_id)
     if user is None:
         return None
@@ -132,9 +129,11 @@ def load_user(user_id):
 
 
 @app.route(URL_INDEX, methods=["GET"])
-@login_required
 def index():
-    return render_template(JINJA_INDEX, models=waifu_models)
+    if current_user.is_authenticated:
+        return render_template(JINJA_INDEX_LOGGED_IN, models=waifu_models)
+
+    return render_template(JINJA_INDEX)
 
 
 @app.route(URL_SIGNUP, methods=["GET"])
@@ -176,8 +175,6 @@ def signup_post():
 
 @app.route(URL_LOGIN, methods=["GET"])
 def login_get():
-    login_user(User(user_id=1, username="test", email="m@gmail.com"), remember=True)
-
     if current_user.is_authenticated:
         return redirect(URL_INDEX)
 
@@ -308,14 +305,28 @@ Waifu:
 
     if request.form["speech"] == "true":
         # TODO deletion
-        AUDIOS_PATH.joinpath("user").mkdir(parents=True, exist_ok=True)
-        file = AUDIOS_PATH.joinpath("user", str(hex(abs(hash(text))))[2:] + ".mp3")
+        userpath = AUDIOS_PATH.joinpath(str(current_user.id))
+        userpath.mkdir(parents=True, exist_ok=True)
+
+        file_name = str(hex(abs(hash(text))))[2:] + ".mp3"
+        file = userpath.joinpath(file_name)
+
         engine.save_to_file(text, str(file))
         engine.runAndWait()
 
-        returnobj["audio"] = str(file.relative_to(PARENT_PATH))
+        user_file_path = AUDIOS_PATH.joinpath(file_name)
+        returnobj["audio"] = str(user_file_path.relative_to(PARENT_PATH))
 
     return returnobj
+
+
+@app.route(
+    "/" + AUDIO_STR_PATH + "<path:audio>",
+    methods=["GET"],
+)
+@login_required
+def url_audio(audio):
+    return send_from_directory(AUDIOS_PATH.joinpath(str(current_user.id)), audio)
 
 
 if __name__ == "__main__":
