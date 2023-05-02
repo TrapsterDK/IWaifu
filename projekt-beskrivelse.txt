@@ -3,6 +3,9 @@ Jeg vil lave en anime waifu chat bot som kan kører i browseren,
 denne chat bot skal kunne tale ved brug af text to speech,
 og tage imod input fra brugeren ved brug af text eller speech to text.
 
+Problemformulering
+Hvordan kan jeg lave en chat bot som kan tale og tage imod input fra brugeren?
+
 Tekniske Krav
 - Chat bot skal kunne kører i browseren
 MAYBE - Chat bot skal kunne kører på alle skærm størrelser
