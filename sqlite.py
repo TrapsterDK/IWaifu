@@ -187,7 +187,7 @@ class Database:
     def get_messages(self, user_id: int, waifu_id: int, limit: int) -> list:
         with self.lock:
             self.conn.execute(
-                "SELECT * FROM messages WHERE user_id = ? AND waifu_id = ? ORDER BY timestamp DESC LIMIT ?",
+                "SELECT * FROM messages WHERE user_id = ? AND waifu_id = ? ORDER BY timestamp ASC LIMIT ?",
                 (user_id, waifu_id, limit),
             )
             messages = self.conn.fetchall()

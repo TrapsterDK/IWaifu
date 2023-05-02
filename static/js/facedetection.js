@@ -42,7 +42,7 @@ Promise.all([
 ]);
 
 // start the video
-function startVideo() {
+window.start_facedetection = function () {
     if (
         !"mediaDevices" in navigator ||
         !"getUserMedia" in navigator.mediaDevices
@@ -66,12 +66,12 @@ function startVideo() {
             console.log("video not started");
             console.log(err);
         });
-}
+};
 
-function StopVideo() {
+window.stop_facedetection = function () {
     video.pause();
     video.srcObject = null;
-}
+};
 
 $(document).ready(function () {
     // https://github.com/justadudewhohacks/face-api.js/
@@ -82,7 +82,9 @@ $(document).ready(function () {
     video.addEventListener("loadedmetadata", async () => {
         console.log("video started");
         // update the values every 10ms
-        setInterval(async () => {
+        let faceinterval = setInterval(async () => {
+            if (video.paused || video.ended) clearInterval(faceinterval);
+
             // detect the face
             const singleFace = await faceapi.detectSingleFace(
                 video,
@@ -147,9 +149,8 @@ $(document).ready(function () {
                         singleFace.score +
                     window.face_coordinates.y * (1 - singleFace.score),
             };
+
+            window.facedetection_callback();
         }, 1000);
     });
-
-    // start the video
-    startVideo();
 });

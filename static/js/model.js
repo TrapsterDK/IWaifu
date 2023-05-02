@@ -9,7 +9,6 @@ function getModelHeadBounds(model) {
     // check if head or Head exists
     head = areas["head"] ?? areas["Head"];
     if (head == undefined) {
-        console.log("no head found");
         return;
     }
 
@@ -41,34 +40,6 @@ window.onload = function () {
     $(window).resize(function () {
         app.renderer.resize(WIDTH, window.innerHeight);
     });
-
-    // mild face following
-    window.face_coordinates = () => {
-        let bounds = getModelHeadBounds(model);
-
-        if (bounds == undefined) {
-            return;
-        }
-
-        bounds = transformBounds(bounds, model);
-
-        let headcenter = new PIXI.Point(
-            bounds.x + bounds.width / 2,
-            bounds.y + bounds.height / 2
-        );
-
-        let movement = new PIXI.Point(
-            window.face_coordinates.x * bounds.width - bounds.width / 2,
-            window.face_coordinates.y * bounds.height - bounds.height / 2
-        );
-
-        let canvaspos = new PIXI.Point(
-            headcenter.x + movement.x,
-            headcenter.y + movement.y
-        );
-
-        model.focus(canvaspos.x, canvaspos.y);
-    };
 
     var model;
 
@@ -107,14 +78,46 @@ window.onload = function () {
             } else {
                 $("#face-following").prop("disabled", false);
             }
+
+            window.refresh_chat();
         }, 750);
     });
+
+    // mild face following
+    window.facedetection_callback = function () {
+        let bounds = getModelHeadBounds(model);
+
+        if (bounds == undefined) {
+            return;
+        }
+
+        bounds = transformBounds(bounds, model);
+
+        let headcenter = new PIXI.Point(
+            bounds.x + bounds.width / 2,
+            bounds.y + bounds.height / 2
+        );
+
+        let movement = new PIXI.Point(
+            window.face_coordinates.x * bounds.width - bounds.width / 2,
+            window.face_coordinates.y * bounds.height - bounds.height / 2
+        );
+
+        console.log(headcenter, movement);
+
+        let canvaspos = new PIXI.Point(
+            headcenter.x + movement.x,
+            headcenter.y + movement.y
+        );
+
+        model.focus(canvaspos.x, canvaspos.y);
+    };
+
     $("#face-following").change(function () {
         if ($(this).is(":checked")) {
-            window.face_callback();
-            model.on("update", window.face_callback);
+            window.start_facedetection();
         } else {
-            model.off("update", window.face_callback);
+            window.stop_facedetection();
         }
     });
 

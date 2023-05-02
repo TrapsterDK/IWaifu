@@ -18,12 +18,13 @@ from sqlite import Database
 from datetime import datetime
 import spacy
 import random
+import json
 
 # pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_lg-0.5.1.tar.gz
 # nlp = spacy.load("en_core_sci_lg")
 
 # https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_sm-0.5.1.tar.gz
-nlp = spacy.load("en_core_sci_sm")
+nlp = spacy.load("en_core_web_sm")
 
 
 # Fake nlp
@@ -52,14 +53,17 @@ class FakeNLP:
 
 # nlp = FakeNLP()
 
+
 engine = pyttsx3.init()
 voice = engine.getProperty("voices")
 engine.setProperty("voice", voice[1].id)
 
 openai.api_key = "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"
 
-MODEL_WAIFU_PATH = pathlib.Path(__file__).parent / "static/models/"
-AUDIOS_PATH = pathlib.Path(__file__).parent / "static/assets/audios/"
+PARENT_PATH = pathlib.Path(__file__).parent
+
+MODEL_WAIFU_PATH = PARENT_PATH / "static/models/"
+AUDIOS_PATH = PARENT_PATH / "static/assets/audios/"
 
 RE_SPLIT_CHAR_INT = re.compile(r"(\d+)")
 waifus_dir = [dir for dir in pathlib.Path(MODEL_WAIFU_PATH).iterdir()]
@@ -71,8 +75,7 @@ waifus_names = [
 ]
 
 waifus_models = [
-    str(next(dir.glob("**/model.json")).relative_to(pathlib.Path(__file__).parent))
-    for dir in waifus_dir
+    str(next(dir.glob("**/model.json")).relative_to(PARENT_PATH)) for dir in waifus_dir
 ]
 
 
@@ -232,24 +235,36 @@ def generate_memory(user_id: int, waifu: str) -> str:
 @app.route(URL_CHAT, methods=["POST"])
 @login_required
 def chat():
-    # get message from request
-    if "message" not in request.form:
-        return "Missing message"
-
     if "waifu" not in request.form:
         return "Missing waifu"
-
-    message = request.form["message"].strip()
-
-    if message == "":
-        return "Empty message"
 
     waifu = request.form["waifu"]
 
     if waifu not in waifus_names:
         return "Invalid waifu"
 
-    db.add_message(current_user.id, waifu, message, True, datetime.now())
+    if "message" not in request.form:
+        messages = db.get_messages(current_user.id, waifu, 50)
+        messages = [
+            {
+                "message": x["message"],
+                "from_user": x["from_user"],
+                "time": datetime.fromtimestamp(x["timestamp"]).strftime(
+                    r"%Y-%m-%d %H:%M"
+                ),
+            }
+            for x in messages
+        ]
+        return messages
+
+    message = request.form["message"].strip()
+
+    if message == "":
+        return "Empty message"
+
+    db.add_message(
+        current_user.id, waifu, message, True, int(datetime.now().timestamp())
+    )
 
     human_memory, waifu_memory = generate_memory(current_user.id, waifu)
     print(human_memory, waifu_memory)
@@ -281,22 +296,27 @@ Waifu:
     text = completion.choices[0].text
 
     waifu_time = datetime.now()
-    db.add_message(current_user.id, waifu, text, False, waifu_time.timestamp())
+    db.add_message(current_user.id, waifu, text, False, int(waifu_time.timestamp()))
 
-    # TODO deletion
-    AUDIOS_PATH.joinpath("user").mkdir(parents=True, exist_ok=True)
-    file = AUDIOS_PATH.joinpath("user", str(hex(abs(hash(text))))[2:] + ".mp3")
-    engine.save_to_file(text, str(file))
-    engine.runAndWait()
+    if "speech" not in request.form:
+        return "missing speech"
 
-    return {
+    returnobj = {
         "message": completion.choices[0].text,
         "time": waifu_time.strftime("%H:%M"),
-        "audio": str(file.relative_to(pathlib.Path(__file__).parent)),
     }
+
+    if request.form["speech"] == "true":
+        # TODO deletion
+        AUDIOS_PATH.joinpath("user").mkdir(parents=True, exist_ok=True)
+        file = AUDIOS_PATH.joinpath("user", str(hex(abs(hash(text))))[2:] + ".mp3")
+        engine.save_to_file(text, str(file))
+        engine.runAndWait()
+
+        returnobj["audio"] = str(file.relative_to(PARENT_PATH))
+
+    return returnobj
 
 
 if __name__ == "__main__":
-    print("Starting server...")
     app.run("localhost", debug=True)
-    # app.run("0.0.0.0", debug=True)

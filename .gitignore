@@ -167,3 +167,6 @@ Scripts/
 /anime_videos
 /anime_videos/sword-art-online-episode-1-english-dubbed.mp4
 database.db
+database.db-shm
+database.db-wal
+/static/assets/audios/user
