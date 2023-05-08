@@ -56,7 +56,7 @@ engine = pyttsx3.init()
 voice = engine.getProperty("voices")
 engine.setProperty("voice", voice[1].id)
 
-openai.api_key = "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"
+openai.api_key = "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"
 
 PARENT_PATH = pathlib.Path(__file__).parent
 
@@ -226,7 +226,7 @@ def generate_memory(user_id: int, waifu: str) -> str:
         else:
             waifu_memory.extend(doc.ents)
 
-    return (human_memory[50:], waifu_memory[30:])
+    return (human_memory[:100], waifu_memory[:50])
 
 
 @app.route(URL_CHAT, methods=["POST"])
@@ -264,7 +264,6 @@ def chat():
     )
 
     human_memory, waifu_memory = generate_memory(current_user.id, waifu)
-
     completion = openai.Completion.create(
         engine="text-davinci-003",  # "text-davinci-003", "text-ada-001"
         prompt=f"""You are a cute waifu, you full of emotions and love. Your name is {waifu}.
@@ -278,14 +277,14 @@ Waifu chat memory:
 
 Human: 
 {message}
-
+ 
 Waifu:
 """,
         temperature=0.7,
         top_p=1,
         frequency_penalty=0.5,
         presence_penalty=0.5,
-        max_tokens=500,
+        max_tokens=1000,
     )
 
     text = completion.choices[0].text
@@ -318,4 +317,4 @@ def url_audio():
 
 
 if __name__ == "__main__":
-    app.run("localhost", debug=True)
+    app.run("0.0.0.0", debug=True)
